@@ -766,8 +766,8 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v30';
-const APP_FECHA='2026-10-26';
+const APP_VERSION='v31';
+const APP_FECHA='2026-10-27';
 const AHORRO_FIJO=1201; // CPN $900 + GYE $300 + Fondo GYE $1 — ahorro fijo mensual desde sep-2026
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -871,6 +871,7 @@ async function load(){
       migrarTcSubcategoriasTransporte();
       migrarRetornosV1();
       migrarTransporteV27();
+      if(vincularLotesGanaderia())save();
       recalcTodo();
       setSyncStatus('synced','✓ Sincronizado con Drive · '+new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}));
       return;
@@ -885,6 +886,7 @@ async function load(){
   migrarTcSubcategoriasTransporte();
   migrarRetornosV1();
   migrarTransporteV27();
+  vincularLotesGanaderia();
   recalcTodo(); // faltaba: sin esto el Dashboard mostraba el hist viejo de localStorage
 }
 
@@ -936,6 +938,7 @@ function importarRespaldo(input){
     migrarTcSubcategoriasTransporte();
     migrarRetornosV1();
     migrarTransporteV27();
+    vincularLotesGanaderia();
     recalcTodo();
     save();
     renderReg();refreshDash();checkAlerts();updateTCTracker();renderInv();renderHistorial();renderBackupEstado();
@@ -1065,6 +1068,31 @@ async function sincronizar(){
 //  'Transporte' nunca perteneció a ningún CAT_*, así que esos egresos quedaban fuera
 //  del historial. Se reclasifican a 'Movilización' (la subcategoría real más cercana).
 // ════════════════════════════════════════
+// Lotes de la Bitácora Ganadera vinculados a un lote creado a mano aquí (fondo activado).
+// El de la Bitácora es el real: el manual se archiva (no se borra) para no contar el capital dos
+// veces y conservar sus aportes. Si en la Bitácora se quita el vínculo o se borra el lote, vuelve.
+function vincularLotesGanaderia(){
+  if(!db.inv||!db.inv.ganado)return false;
+  db.inv.ganadoVinculados=db.inv.ganadoVinculados||[];
+  const reales=db.inv.ganado.filter(g=>g.origen==='ganaderia'&&g.vinculoId!=null);
+  let cambio=false;
+  reales.forEach(r=>{
+    const i=db.inv.ganado.findIndex(g=>g.origen!=='ganaderia'&&String(g.id)===String(r.vinculoId));
+    if(i<0)return;
+    const m=db.inv.ganado.splice(i,1)[0];
+    db.inv.ganadoVinculados=db.inv.ganadoVinculados.filter(a=>String(a.id)!==String(m.id));
+    db.inv.ganadoVinculados.push({...m,absorbidoPor:r.id,fechaVinculo:today()});
+    cambio=true;
+  });
+  db.inv.ganadoVinculados=db.inv.ganadoVinculados.filter(a=>{
+    if(reales.some(r=>String(r.vinculoId)===String(a.id)))return true;
+    const {absorbidoPor,fechaVinculo,...orig}=a;
+    if(!db.inv.ganado.some(g=>String(g.id)===String(orig.id)))db.inv.ganado.push(orig);
+    cambio=true;
+    return false;
+  });
+  return cambio;
+}
 function migrarTransporteV27(){
   if(db._migTransporteV27)return;
   let n=0;
@@ -2399,8 +2427,10 @@ function renderGanado(){
       :(venc?`<button class="btn btn-p btn-sm" onclick="openRetornoModal('ganado',${inv.id})" title="Registrar venta y retorno">💰</button>`:'—');
     // Fila con botón de registrar venta si no está vendido
     const accionVenta='';
+    const vinc=inv.origen==='ganaderia'&&inv.vinculoId!=null
+      ?`<div style="font-size:10px;color:var(--tx3);margin-top:2px;">🔗 Reemplaza a: ${inv.vinculoDesc||'lote de Finanzas'} (${fm(inv.vinculoCap||0)})${Math.abs((inv.vinculoCap||0)-cap)>0.5?` · <span style="color:var(--warn);">diferencia ${cap-(inv.vinculoCap||0)<0?'−':'+'}${fm(cap-(inv.vinculoCap||0))}</span>`:''}</div>`:'';
     return `<tr style="${vendido?'opacity:.8':''}">
-      <td><strong>${inv.desc||'—'}</strong></td>
+      <td><strong>${inv.desc||'—'}</strong>${vinc}</td>
       <td class="mono tr">${fm(cap)}</td>
       <td class="mono" style="font-size:11px;">${inv.fi||'—'}</td>
       <td class="tc">${inv.enFormacion?'—':(inv.plazo||0)+'m'}</td>

@@ -2,7 +2,7 @@
 // El nombre del caché lleva la versión de la app: al publicar una versión nueva
 // cambia el nombre, se descarta el caché viejo y el teléfono deja de quedarse
 // pegado en una versión anterior.
-const VERSION = 'v29';
+const VERSION = 'v30';
 const CACHE = 'finanzas-' + VERSION;
 
 // Lo mínimo para que la app abra sin señal.
@@ -52,7 +52,7 @@ self.addEventListener('fetch', e => {
   // Sin señal, cae al caché.
   if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: 'no-store' })
         .then(r => {
           const copia = r.clone();
           caches.open(CACHE).then(c => c.put('./index.html', copia)).catch(() => {});

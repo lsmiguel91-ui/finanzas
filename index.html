@@ -766,7 +766,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v28';
+const APP_VERSION='v29';
 const APP_FECHA='2026-10-26';
 const AHORRO_FIJO=1201; // CPN $900 + GYE $300 + Fondo GYE $1 — ahorro fijo mensual desde sep-2026
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1748,6 +1748,7 @@ function guardarRetorno(){
 // ════════════════════════════════════════
 let pieC;
 function refreshDash(){
+  renderBackupEstado(); // depende de db: debe repintarse con cada refresco, no una sola vez al arrancar
   const yr=parseInt(document.getElementById('dYear').value);
   const mi=parseInt(document.getElementById('dMonth').value);
   const mn=MN[mi];
@@ -4712,7 +4713,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   }
   document.getElementById('hdate').textContent=now.toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
   const _av=document.getElementById('app-ver'); if(_av){_av.textContent=APP_VERSION;_av.title='FINANZAS_LM '+APP_VERSION+' · '+APP_FECHA;}
-  renderBackupEstado();
   renderConexionEstado();
   document.getElementById('rFecha').value=today();
   document.getElementById('mainModal').addEventListener('click',function(e){if(e.target===this)closeModal();});

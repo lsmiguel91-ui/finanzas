@@ -2,7 +2,7 @@
 // El nombre del caché lleva la versión de la app: al publicar una versión nueva
 // cambia el nombre, se descarta el caché viejo y el teléfono deja de quedarse
 // pegado en una versión anterior.
-const VERSION = 'v28';
+const VERSION = 'v29';
 const CACHE = 'finanzas-' + VERSION;
 
 // Lo mínimo para que la app abra sin señal.

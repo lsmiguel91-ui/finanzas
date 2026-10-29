@@ -766,7 +766,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v32';
+const APP_VERSION='v33';
 const APP_FECHA='2026-10-29';
 const AHORRO_FIJO=1201; // CPN $900 + GYE $300 + Fondo GYE $1 — ahorro fijo mensual desde sep-2026
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -813,6 +813,14 @@ let db={
   invCerradas:[] // claves 'ganado:<id>' de lotes vendidos cuyo retorno ya se registró
 };
 
+// ── Control de orden entre guardados y lecturas ──
+// _saveSeq sube con cada guardado; _savePend cuenta los que están en vuelo.
+// Una lectura que salió antes de un guardado trae datos sin ese cambio: si se
+// aplicara, borraría de memoria y del respaldo local lo que se acaba de registrar
+// (así se perdió un plazo fijo el 29-oct-2026). Drive sigue siendo la única fuente
+// de verdad; lo único que se respeta aquí es el orden de las operaciones.
+let _saveSeq=0, _savePend=0;
+
 // ── Sync status UI ──
 function setSyncStatus(estado, msg){
   const dot=document.getElementById('sync-dot');
@@ -824,8 +832,10 @@ function setSyncStatus(estado, msg){
 // ── Guardar en Drive (primario) + localStorage (respaldo) ──
 async function save(){
   guardarLocal();
+  _saveSeq++; // el estado local cambió: invalida cualquier lectura ya en camino
   if(!SCRIPT_URL) return; // Sin conexión configurada todavía
   setSyncStatus('syncing','Guardando en Drive...');
+  _savePend++;
   try{
     const r=await fetch(SCRIPT_URL,{
       method:'POST', mode:'cors',
@@ -843,11 +853,16 @@ async function save(){
     setSyncStatus('offline','⚠️ NO guardado en Drive — '+msg.substring(0,80));
     if(typeof toast==='function')toast('⚠️ No se guardó en Drive: '+msg.substring(0,120));
     console.error('[save] fallo al guardar en Drive:',e);
+  }finally{
+    _savePend--;
   }
 }
 
 // ── Cargar desde Drive (primario) ──
-async function load(){
+async function load(opts){
+  const _auto=!!(opts&&opts.auto);
+  // Con un guardado en vuelo, la respuesta llegaría sin lo que se está subiendo.
+  if(_auto&&_savePend>0)return;
   guardarLocal(); // por si acaso
   if(!SCRIPT_URL){
     cargarLocal();
@@ -856,9 +871,16 @@ async function load(){
     return;
   }
   setSyncStatus('syncing','Conectando con Drive...');
+  const _seqAntes=_saveSeq;
   try{
     const r=await fetch(SCRIPT_URL+'?action=leer&t='+Date.now(),{method:'GET',mode:'cors'});
     const j=await r.json();
+    // La hoja respondió con un estado anterior al último guardado (o hay uno en
+    // vuelo): aplicarlo borraría el cambio recién hecho. Se descarta la lectura.
+    if(_saveSeq!==_seqAntes||_savePend>0){
+      setSyncStatus('synced','✓ Guardado · lectura pospuesta por cambio reciente');
+      return;
+    }
     if(j.ok&&j.data){
       Object.assign(db,j.data);
       guardarLocal();
@@ -4769,14 +4791,15 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     setTimeout(()=>{renderPie(0,0,0,0,0,0,0,0);},100);
   }
 
-  // Auto-sincronizar cada 2 minutos
+  // Auto-sincronizar cada 5 minutos
   setInterval(async()=>{
     if(!SCRIPT_URL)return;
-    await load();
+    if(_savePend>0)return; // nunca leer encima de un guardado en curso
+    await load({auto:true});
     recalcTodo();
     refreshDash();renderReg();
     renderInv();updateInvKpis();
-  }, 120000);
+  }, 300000);
 });
 </script>
 </body>

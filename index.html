@@ -766,8 +766,8 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v31';
-const APP_FECHA='2026-10-27';
+const APP_VERSION='v32';
+const APP_FECHA='2026-10-29';
 const AHORRO_FIJO=1201; // CPN $900 + GYE $300 + Fondo GYE $1 — ahorro fijo mensual desde sep-2026
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -2484,7 +2484,7 @@ function renderGanadoAsogan(){
       <div style="flex:1;">
         <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:3px;">${s.catNom} — ${s.sBanner}</div>
         <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">${s.sTexto}</div>
-        <div style="font-size:10px;color:var(--tx3);">Mejor mes: <strong style="color:var(--ac);">${s.mejorMesAnio}</strong>${s.mesesFuertes&&s.mesesFuertes.length?' · Meses fuertes: '+s.mesesFuertes.join(', '):''} · Pos. actual: #${s.posVenta}/12</div>
+        <div style="font-size:10px;color:var(--tx3);">Mejor momento: <strong style="color:var(--ac);">${s.mejorMesAnio}</strong></div>
       </div>
     </div>`;
   }).join('');

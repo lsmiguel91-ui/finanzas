@@ -471,6 +471,9 @@ details[open] summary::before{transform:rotate(90deg);}
   <!-- ═══ DIFERIDOS TC TRACKER ═══ -->
   <div id="diferidos-dash" class="dif-tracker" style="display:none;"></div>
 
+  <!-- Aviso: ahorros del mes aún no registrados -->
+  <div id="ahorros-dash" style="display:none;margin-bottom:16px;"></div>
+
   <!-- Selector mes -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;">Dashboard — <span id="dashLabel" style="color:var(--ac)">Mayo 2026</span></div>
@@ -766,9 +769,10 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v33';
-const APP_FECHA='2026-10-29';
-const AHORRO_FIJO=1201; // CPN $900 + GYE $300 + Fondo GYE $1 — ahorro fijo mensual desde sep-2026
+const APP_VERSION='v34';
+const APP_FECHA='2026-11-01';
+// El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
+// cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 let db={
@@ -893,6 +897,7 @@ async function load(opts){
       migrarTcSubcategoriasTransporte();
       migrarRetornosV1();
       migrarTransporteV27();
+      migrarRecargoV34();
       if(vincularLotesGanaderia())save();
       recalcTodo();
       setSyncStatus('synced','✓ Sincronizado con Drive · '+new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}));
@@ -908,6 +913,7 @@ async function load(opts){
   migrarTcSubcategoriasTransporte();
   migrarRetornosV1();
   migrarTransporteV27();
+  migrarRecargoV34();
   vincularLotesGanaderia();
   recalcTodo(); // faltaba: sin esto el Dashboard mostraba el hist viejo de localStorage
 }
@@ -960,6 +966,7 @@ function importarRespaldo(input){
     migrarTcSubcategoriasTransporte();
     migrarRetornosV1();
     migrarTransporteV27();
+    migrarRecargoV34();
     vincularLotesGanaderia();
     recalcTodo();
     save();
@@ -1115,6 +1122,19 @@ function vincularLotesGanaderia(){
   });
   return cambio;
 }
+// Los $6 que cobra la cooperativa salen del efectivo pero no son ahorro del usuario.
+// Se registran como recargo de la meta para que el esperado dé 906 y no 900.
+function migrarRecargoV34(){
+  if(db._migRecargoV34)return;
+  let n=0;
+  (db.inv.metas||[]).forEach(m=>{
+    if(m.recargo===undefined && catAhorroDeEntidad(m.desc)==='Ahorros CPN'){m.recargo=6;n++;}
+  });
+  db._migRecargoV34=true;
+  if(n>0)console.log('[Migración v34] recargo $6 aplicado a '+n+' meta(s) de CPN');
+  save(); // la migración muta db: debe persistir o se revierte al recargar
+}
+
 function migrarTransporteV27(){
   if(db._migTransporteV27)return;
   let n=0;
@@ -1555,6 +1575,70 @@ function calcSaldoHastaMes(yr,mn){
 // Sin ella, un Historial de N meses dispara O(N²) recorridos completos de db.movimientos.
 let _cacheCash={};
 function invalidarCacheCash(){_cacheCash={};}
+// ════════════════════════════════════════
+//  AHORRO MENSUAL ESPERADO — derivado de las metas
+//  Fuente: el tramo de aporte vigente de cada meta + el recargo no recuperable que
+//  cobra la entidad (p. ej. los $6 de la cooperativa, que salen del efectivo pero no
+//  son ahorro del usuario). Nunca una constante: si cambia un tramo, esto cambia solo.
+// ════════════════════════════════════════
+function catAhorroDeEntidad(desc){
+  const d=(desc||'').toLowerCase();
+  if(d.includes('cpn')||d.includes('polic'))return 'Ahorros CPN';
+  if(d.includes('guayaquil'))return 'Ahorros Banco Guayaquil';
+  return 'Otros Ahorros';
+}
+// Monto de aporte vigente de una meta para un mes dado (último tramo que ya empezó)
+function tramoVigente(inv,yr,mi){
+  const ref=new Date(yr,mi,1);
+  const tr=(inv.tramosAporte&&inv.tramosAporte.length)
+    ? [...inv.tramosAporte].sort((a,b)=>a.desde.localeCompare(b.desde))
+    : [{desde:inv.fi||today(),monto:inv.aporte||0}];
+  let v=0,hay=false;
+  tr.forEach(t=>{ if(t.desde&&parseLocalDate(t.desde)<=ref){v=t.monto||0;hay=true;} });
+  return hay?v:0;
+}
+// Lo que debería salir del efectivo este mes, meta por meta
+function ahorrosEsperadosMes(yr,mi){
+  const ref=new Date(yr,mi,1);
+  const out=[];
+  (db.inv.metas||[]).forEach(inv=>{
+    if(inv.fi){
+      if(parseLocalDate(inv.fi)>ref)return;                    // aún no empieza
+      const fin=addM(inv.fi,inv.plazo||12);
+      if(fin&&parseLocalDate(fin)<ref)return;                  // ya terminó
+    }
+    const base=tramoVigente(inv,yr,mi);
+    const rec=inv.recargo||0;
+    const monto=Math.round((base+rec)*100)/100;
+    if(monto>0.004)out.push({id:inv.id,nombre:(inv.nombre?inv.nombre+' · ':'')+inv.desc,
+      cat:catAhorroDeEntidad(inv.desc),monto,base,rec});
+  });
+  return out;
+}
+// Lo esperado menos lo que ya registró el usuario ese mes, por categoría de ahorro.
+// Así nunca se cuenta dos veces: si ya lo anotó a mano, no queda pendiente.
+function ahorrosPendientesMes(yr,mi){
+  const saldoCat={};
+  (db.movimientos||[]).forEach(m=>{
+    if(m.tipo!=='egreso'||esFlujoInv(m)||!CAT_AHO.includes(m.categoria))return;
+    const d=parseLocalDate(m.fecha);
+    if(d.getFullYear()!==yr||d.getMonth()!==mi)return;
+    saldoCat[m.categoria]=(saldoCat[m.categoria]||0)+(m.monto||0);
+  });
+  const pend=[];
+  ahorrosEsperadosMes(yr,mi).forEach(e=>{
+    const disp=saldoCat[e.cat]||0;
+    const cubre=Math.min(disp,e.monto);
+    saldoCat[e.cat]=disp-cubre;
+    const falta=Math.round((e.monto-cubre)*100)/100;
+    if(falta>0.004)pend.push({...e,monto:falta});
+  });
+  return pend;
+}
+function totalAhorrosPendientes(yr,mi){
+  return ahorrosPendientesMes(yr,mi).reduce((t,p)=>t+p.monto,0);
+}
+
 function cashRealFinMes(yr,mi){
   const _k=yr+'-'+mi;
   if(Object.prototype.hasOwnProperty.call(_cacheCash,_k)) return _cacheCash[_k];
@@ -1583,8 +1667,11 @@ function _cashRealFinMesCalc(yr,mi){
   const now=new Date();
   const esMesActual=(yr===now.getFullYear()&&mi===now.getMonth());
   const varProy=esMesActual?calcProyeccion().variablesProyectadas:0;
+  // Ahorro del mes aún no registrado: ya está comprometido (débito automático), así que
+  // no es cash disponible. Si el usuario ya lo anotó, esto da 0 y no se descuenta dos veces.
+  const ahoPend=esMesActual?totalAhorrosPendientes(yr,mi):0;
   const flujo=flujoInvMes(yr,mi).neto; // retornos − reinversiones (fuera de A/B, sí es cash)
-  return saldoIni+(ing-egrEf)-varProy-tc+flujo;
+  return saldoIni+(ing-egrEf)-varProy-ahoPend-tc+flujo;
 }
 // Saldo inicial (C) de un mes = cash real post-TC del mes anterior
 function saldoInicialMes(yr,mi){
@@ -1797,6 +1884,66 @@ function guardarRetorno(){
 //  DASHBOARD REFRESH
 // ════════════════════════════════════════
 let pieC;
+// ════════════════════════════════════════
+//  AVISO DE AHORROS DEL MES
+//  Propone los aportes que aún no están registrados; NO los crea solo. El usuario
+//  revisa los montos, los edita si ese mes cambió algo, y confirma.
+// ════════════════════════════════════════
+function renderAhorrosPend(){
+  const el=document.getElementById('ahorros-dash');
+  if(!el)return;
+  const now=new Date();
+  const yr=now.getFullYear(), mi=now.getMonth();
+  // Solo el mes en curso: en meses cerrados el histórico es lo que realmente pasó.
+  const selY=parseInt(document.getElementById('dYear')?.value||yr);
+  const selM=parseInt(document.getElementById('dMonth')?.value||mi);
+  const pend=(selY===yr&&selM===mi)?ahorrosPendientesMes(yr,mi):[];
+  if(!pend.length){el.style.display='none';el.innerHTML='';return;}
+  const tot=pend.reduce((t,x)=>t+x.monto,0);
+  el.style.display='block';
+  el.innerHTML=`<div style="padding:14px 16px;background:rgba(159,122,234,.08);border:1px solid rgba(159,122,234,.35);border-radius:11px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+      <span style="font-size:18px;">💰</span>
+      <strong style="font-size:14px;">Ahorros de ${MN[mi]} sin registrar</strong>
+    </div>
+    <div style="font-size:11px;color:var(--tx3);margin-bottom:10px;">Ya están descontados de tu cash porque el débito es automático. Revisa los montos y confirma para que queden en el historial.</div>
+    ${pend.map((x,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;flex-wrap:wrap;">
+      <span style="font-size:12px;flex:1;min-width:150px;">${esc(x.nombre)}${x.rec>0?` <span style="font-size:10px;color:var(--tx3);">(${fm(x.base)} + ${fm(x.rec)} de la entidad)</span>`:''}</span>
+      <input id="aho-m-${i}" type="number" inputmode="decimal" step="0.01" value="${x.monto.toFixed(2)}" style="width:110px;background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:6px 8px;color:var(--tx);font-family:'DM Mono',monospace;font-size:13px;text-align:right;"/>
+    </div>`).join('')}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <span style="font-family:'DM Mono',monospace;font-size:13px;color:#9f7aea;"><strong>${fm(tot)}</strong> en total</span>
+      <button class="btn btn-p btn-sm" onclick="registrarAhorrosMes()">✓ Registrar ahorros</button>
+    </div>
+  </div>`;
+}
+
+function registrarAhorrosMes(){
+  const now=new Date();
+  const yr=now.getFullYear(), mi=now.getMonth();
+  const pend=ahorrosPendientesMes(yr,mi);
+  if(!pend.length){toast('Los ahorros de este mes ya están registrados');renderAhorrosPend();return;}
+  const fecha=yr+'-'+String(mi+1).padStart(2,'0')+'-01';
+  const lineas=[];
+  pend.forEach((x,i)=>{
+    const v=parseFloat(document.getElementById('aho-m-'+i)?.value);
+    const monto=Math.round((isNaN(v)?x.monto:v)*100)/100;
+    if(monto>0.004)lineas.push({...x,monto});
+  });
+  if(!lineas.length){toast('⚠️ No hay montos que registrar');return;}
+  const tot=lineas.reduce((t,x)=>t+x.monto,0);
+  if(!confirm(`¿Registrar ${lineas.length} ${lineas.length===1?'ahorro':'ahorros'} de ${MN[mi]} por ${fm(tot)} en total, con fecha ${fecha}?\n\n`
+    +lineas.map(x=>'· '+x.nombre+' — '+fm(x.monto)).join('\n')))return;
+  lineas.forEach(x=>{
+    db.movimientos.unshift({id:Date.now()+Math.floor(Math.random()*100000),fecha,
+      monto:x.monto,categoria:x.cat,descripcion:x.nombre,tipo:'egreso'});
+  });
+  recalcHistMes(yr,mi);
+  save();
+  renderReg();refreshDash();checkAlerts();renderInv();updateInvKpis();
+  toast('✅ '+lineas.length+' ahorros registrados · '+fm(tot));
+}
+
 function refreshDash(){
   renderBackupEstado(); // depende de db: debe repintarse con cada refresco, no una sola vez al arrancar
   const yr=parseInt(document.getElementById('dYear').value);
@@ -1804,6 +1951,7 @@ function refreshDash(){
   const mn=MN[mi];
   document.getElementById('dashLabel').textContent=mn+' '+yr;
   document.getElementById('egr-lbl').textContent=mn+' '+yr;
+  renderAhorrosPend();
   const h=db.hist.find(x=>x.a===yr&&x.m===mn)||{ing:0,ev:0,imp:0,deu:0,aho:0};
   const ing=h.ing||0,ev=h.ev||0,imp=h.imp||0,deu=h.deu||0,aho=h.aho||0;
   const tc=getTCEstado(yr,mi); // TC del mes (lump sum, fuera del 40-30-30)
@@ -2605,7 +2753,10 @@ function renderMetas(){
   const now_rm=new Date();
   db.inv.metas.forEach(inv=>{
     const res=calcMetaConRetiros(inv.fi||today(),inv.aporte||0,inv.tasaA||0,inv.plazo||12,inv.retiros||[],inv.aportesExtra||[],inv.tramosAporte||[]);
-    totAp+=(inv.aporte||0);totC+=res.capitalReal;totI+=res.interes;totF+=res.saldo;
+    // El total debe reflejar el aporte VIGENTE, no el primer tramo: con tramos
+    // 400→600→900 el total sumaba 400 y mostraba $901 en vez de $1.500.
+    totAp+=tramoVigente(inv,now_rm.getFullYear(),now_rm.getMonth()); // aporte, sin el recargo de la entidad
+    totC+=res.capitalReal;totI+=res.interes;totF+=res.saldo;
   });
   document.getElementById('m-ap').textContent=fm(totAp)+'/mes';
   document.getElementById('m-cap').textContent=fm(totC);
@@ -2828,6 +2979,10 @@ function openInvModal(type,id){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <div class="fg"><label>Tasa Anual (%)</label><input id="mi-tasa" type="number" inputmode="decimal" value="${inv?.tasaA||''}" placeholder="6.5" step="0.01" oninput="prevCalc()"/></div>
       <div class="fg"><label>Plazo (meses)</label><input id="mi-plazo" type="number" inputmode="decimal" value="${inv?.plazo||12}" placeholder="12" oninput="prevCalc()"/></div>
+    </div>
+    <div class="fg"><label>Recargo mensual de la entidad ($)</label>
+      <input id="mi-recargo" type="number" inputmode="decimal" value="${inv?.recargo||0}" placeholder="0" step="0.01"/>
+      <div style="font-size:10px;color:var(--tx3);margin-top:3px;">Lo que la entidad cobra además del aporte y no se recupera. Sale de tu efectivo pero no suma a la meta. En CPN son $6.</div>
     </div>
     <div class="fg"><label>Fecha Inicio</label><input id="mi-fi" type="date" value="${inv?.fi||today()}"/></div>
     <!-- TRAMOS DE APORTE MENSUAL -->
@@ -3186,6 +3341,7 @@ function saveModal(){
     obj.nombre=_nom4;
     obj.desc=_ent4;
     obj.tasaA=parseFloat(document.getElementById('mi-tasa')?.value)||0;
+    obj.recargo=parseFloat(document.getElementById('mi-recargo')?.value)||0;
     obj.retiros=getRetirosDelModal();
     obj.aportesExtra=getAportesDelModal();
     obj.tramosAporte=getTramosDelModal();
@@ -3358,9 +3514,13 @@ function analisisEscenarios(){
   }
   function fmM(m){if(!m)return '&gt;40 años';if(m<12)return m+' meses';return Math.floor(m/12)+'a '+m%12+'m';}
 
+  // Aporte real = suma de los tramos vigentes de las metas (sin el recargo de la
+  // entidad, que no se recupera y por tanto no es patrimonio).
+  const _nowEsc=new Date();
+  const _apReal=(db.inv.metas||[]).reduce((t,inv)=>t+tramoVigente(inv,_nowEsc.getFullYear(),_nowEsc.getMonth()),0);
   const escs=[
-    {nom:'🟠 Real',ap:AHORRO_FIJO,bonus:0,staging:0,color:'var(--gold)',nota:`${fm(AHORRO_FIJO)}/mes fijo: CPN $900 + GYE $300 + Fondo $1`},
-    {nom:'🟢 Optimista',ap:1696,bonus:0,staging:stagingTotal,color:'var(--ok)',nota:'$1,201 fijo + ~$495/mes del carro liberado + IC reinvertido'},
+    {nom:'🟠 Real',ap:_apReal,bonus:0,staging:0,color:'var(--gold)',nota:`${fm(_apReal)}/mes — aporte vigente de tus metas`},
+    {nom:'🟢 Optimista',ap:_apReal+495,bonus:0,staging:stagingTotal,color:'var(--ok)',nota:`${fm(_apReal)} + ~$495/mes del carro liberado + IC reinvertido`},
   ];
   const plazos=[12,24,60];
   let rows='';

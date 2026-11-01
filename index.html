@@ -779,7 +779,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v37';
+const APP_VERSION='v38';
 const APP_FECHA='2026-11-01';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
@@ -909,6 +909,7 @@ async function load(opts){
       migrarTransporteV27();
       migrarRecargoV34();
       migrarCategoriasV36();
+      migrarFechasTCV38();
       if(vincularLotesGanaderia())save();
       recalcTodo();
       setSyncStatus('synced','✓ Sincronizado con Drive · '+new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}));
@@ -926,6 +927,7 @@ async function load(opts){
   migrarTransporteV27();
   migrarRecargoV34();
   migrarCategoriasV36();
+  migrarFechasTCV38();
   vincularLotesGanaderia();
   recalcTodo(); // faltaba: sin esto el Dashboard mostraba el hist viejo de localStorage
 }
@@ -980,6 +982,7 @@ function importarRespaldo(input){
     migrarTransporteV27();
     migrarRecargoV34();
     migrarCategoriasV36();
+    migrarFechasTCV38();
     vincularLotesGanaderia();
     recalcTodo();
     save();
@@ -1135,6 +1138,67 @@ function vincularLotesGanaderia(){
   });
   return cambio;
 }
+// Repara los estados de cuenta importados con fecha equivocada (bug corregido en v38):
+// el año salía del corte aunque la línea fuera de un año anterior, y las cuotas de
+// diferidos se imputaban al mes de la compra. Todo es deducible del propio registro:
+// cada tcPago guarda su período, así que no hay nada que adivinar.
+function migrarFechasTCV38(){
+  if(db._migFechasTCV38)return;
+  let nFechas=0,nReg=0,nImp=0,nDif=0;
+  (db.tcPagos||[]).forEach(p=>{
+    const per=(p.periodo||'').split('→').map(x=>x.trim());
+    if(per.length!==2||per[1].length<10)return;
+    const fin=per[1], finY=parseInt(fin.substring(0,4)), finM=parseInt(fin.substring(5,7));
+    const impMes=MN[finM-1];
+    if(!p.periodoImport||p.periodoImport.anyo!==finY||p.periodoImport.mes!==impMes){
+      p.periodoImport={anyo:finY,mes:impMes};nImp++;
+    }
+    (p.detalle||[]).forEach(d=>{
+      if(!d.fecha||d.fecha.length<10)return;
+      if(d.fecha>fin){                       // imposible: posterior al corte del estado
+        if(d.diferido){ d.fechaCompra=(parseInt(d.fecha.substring(0,4))-1)+d.fecha.substring(4);
+                        d.fecha=fin; nDif++; }
+        else { d.fecha=(parseInt(d.fecha.substring(0,4))-1)+d.fecha.substring(4); }
+        nFechas++;
+      } else if(d.diferido&&d.fecha<per[0]){ // cuota de una compra vieja: se cobra ahora
+        d.fechaCompra=d.fecha; d.fecha=fin; nDif++;
+      }
+    });
+    const ds=(p.detalle||[]).filter(x=>x.fecha);
+    if(ds.length){
+      const f=ds[0].fecha, ny=parseInt(f.substring(0,4)), nm=parseInt(f.substring(5,7));
+      if(p.anyo!==ny||p.mes!==MN[nm-1]){p.anyo=ny;p.mes=MN[nm-1];nReg++;}
+    }
+  });
+  // Tracker de diferidos: recalcular la fecha de fin desde los estados ya importados.
+  // 'hasta' venía de la fecha de compra mal fechada, así que daba años absurdos
+  // (un diferido pagado en marzo figuraba hasta 2027). La última vez que una cuota
+  // aparece en un estado + las cuotas que faltan da la fecha real de término.
+  const hoyKey=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  (db.diferidos||[]).forEach(d=>{
+    const clave=(d.desc||'').substring(0,12).toUpperCase();
+    if(!clave)return;
+    let ultima='';
+    (db.tcPagos||[]).forEach(p=>(p.detalle||[]).forEach(x=>{
+      if(!x.diferido||!x.fecha)return;
+      const dx=(x.descripcion||'').toUpperCase();
+      if(dx.includes(clave)||clave.includes(dx.substring(0,8))){ if(x.fecha>ultima)ultima=x.fecha; }
+    }));
+    if(!ultima)return;
+    const restantes=Math.max(0,(d.totalCuotas||0)-(d.cuotaActual||0));
+    const f=parseLocalDate(ultima); f.setMonth(f.getMonth()+restantes);
+    d.hasta=f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0');
+  });
+  const antes=(db.diferidos||[]).length;
+  db.diferidos=(db.diferidos||[]).filter(d=>!d.hasta||d.hasta>=hoyKey);
+  const quitados=antes-db.diferidos.length;
+  db._migFechasTCV38=true;
+  console.log('[Migración v38] fechas corregidas: '+nFechas+', cuotas reimputadas: '+nDif+', registros remes: '+nReg+', periodoImport: '+nImp+', diferidos vencidos quitados: '+quitados);
+  if(typeof toast==='function'&&(nFechas||quitados))toast('🔧 Estados de cuenta corregidos: '+nFechas+' fechas, '+quitados+' diferidos vencidos');
+  recalcTodo();
+  save();
+}
+
 // Reclasifica a las categorías alineadas con el SRI (v36). Solo cambia lo que una regla
 // de comercio reconoce con certeza, o los nombres que dejaron de existir. Un movimiento
 // cuya descripción no matchea ninguna regla se queda donde está: es preferible dejarlo
@@ -4831,6 +4895,16 @@ function parsearEstadoBG(text){
     if(desde&&hastaStr)break;
   }
 
+  // El año del estado NO sirve para todas las líneas. Una fila de diferido lleva la
+  // fecha de la COMPRA original, que puede ser de un año antes: "NOV/30 ... DIF. 1/3"
+  // en el estado de febrero es una compra de noviembre del año anterior. Si el mes es
+  // posterior al del corte, la transacción es del año previo.
+  const _mCorte=parseInt((hastaStr||'').substring(5,7))||12;
+  const anioDe=(mesStr)=>{
+    const m=parseInt(MES[(mesStr||'').toUpperCase()]||'0');
+    return (m>_mCorte)?periYear-1:periYear;
+  };
+
   const transacciones=[];
   const diferidosGracia=[];
   let inConsumos=false,inGracia=false;
@@ -4866,8 +4940,10 @@ function parsearEstadoBG(text){
     const dm=l.match(new RegExp(`(${MESES_RE})\\/(\\d{2})\\s+\\S+\\s+(.+?)\\s+D\\s*I\\s*F\\s*\\.?\\s*(\\d+)\\/(\\d+)\\s+\\$\\s*([\\d.]+)`,'i'));
     if(dm&&parseInt(dm[4])>0){
       const mes=MES[dm[1].toUpperCase()];
-      const yr=(mes&&parseInt(mes)>=(parseInt(MES[Object.keys(MES).find(k=>k===dm[1].toUpperCase())||'ENE'])||1))?periYear:periYear;
-      transacciones.push({fecha:`${yr}-${mes}-${dm[2]}`,descripcion:dm[3].trim().replace(/\s+/g,' ').substring(0,40),monto:parseFloat(dm[6]),diferido:true,cuota:parseInt(dm[4]),totalCuotas:parseInt(dm[5])});
+      // La CUOTA se cobra en este estado, aunque la compra sea vieja: se imputa a la
+      // fecha de corte. La fecha de compra se conserva aparte, como dato.
+      const fCompra=`${anioDe(dm[1])}-${mes}-${dm[2]}`;
+      transacciones.push({fecha:hastaStr||fCompra,fechaCompra:fCompra,descripcion:dm[3].trim().replace(/\s+/g,' ').substring(0,40),monto:parseFloat(dm[6]),diferido:true,cuota:parseInt(dm[4]),totalCuotas:parseInt(dm[5])});
       continue;
     }
 
@@ -4875,7 +4951,7 @@ function parsearEstadoBG(text){
     const rm=l.match(new RegExp(`(${MESES_RE})\\/(\\d{2})\\s+\\S+\\s+(.+?)\\s+C\\s*O\\s*N\\s*S\\s*\\.\\s+\\$\\s*([\\d.]+)`,'i'));
     if(rm){
       const mes=MES[rm[1].toUpperCase()];
-      transacciones.push({fecha:`${periYear}-${mes}-${rm[2]}`,descripcion:rm[3].trim().replace(/\s+/g,' ').substring(0,40),monto:parseFloat(rm[4]),diferido:false,cuota:null,totalCuotas:null});
+      transacciones.push({fecha:`${anioDe(rm[1])}-${mes}-${rm[2]}`,descripcion:rm[3].trim().replace(/\s+/g,' ').substring(0,40),monto:parseFloat(rm[4]),diferido:false,cuota:null,totalCuotas:null});
       continue;
     }
 
@@ -4886,7 +4962,7 @@ function parsearEstadoBG(text){
       const mes=MES[ndm[1].toUpperCase()];
       const montoBase=parseFloat(ndm[4]);
       const iva=ndm[5]?parseFloat(ndm[5]):0;
-      transacciones.push({fecha:`${periYear}-${mes}-${ndm[2]}`,descripcion:ndm[3].trim().replace(/\s+/g,' ').substring(0,40),monto:montoBase+iva,diferido:false,cuota:null,totalCuotas:null,categoriaForzada:'Otros'});
+      transacciones.push({fecha:`${anioDe(ndm[1])}-${mes}-${ndm[2]}`,descripcion:ndm[3].trim().replace(/\s+/g,' ').substring(0,40),monto:montoBase+iva,diferido:false,cuota:null,totalCuotas:null,categoriaForzada:'Otros'});
     }
   }
 
@@ -4972,8 +5048,12 @@ async function confirmarTC(){
   const diferidos=sel.filter(t=>t.diferido);
 
   const now=new Date();
-  const importAnyo=now.getFullYear();
-  const importMes=MN[now.getMonth()];
+  // El estado pertenece a su mes de CORTE, no al mes en que se lo importa. Usar la
+  // fecha de importación hacía que un estado viejo cargado hoy se contara como el
+  // estado del mes actual (así aparecieron $796,47 en noviembre de 2026).
+  const _fCorte=(data.periodo&&data.periodo.hasta)?parseLocalDate(data.periodo.hasta):now;
+  const importAnyo=_fCorte.getFullYear();
+  const importMes=MN[_fCorte.getMonth()];
   const totalTC=Math.round(sel.reduce((s,t)=>s+t.monto,0)*100)/100;
 
   if(!db.tcPagos)db.tcPagos=[];

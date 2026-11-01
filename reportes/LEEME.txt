@@ -1,0 +1,14 @@
+Scripts del reporte mensual de finanzas (se ejecutan desde la tarea programada
+"Reporte mensual de finanzas", que corre el dia 5 de cada mes).
+
+calc_finanzas.py     Calcula los numeros del mes desde el JSON de la app.
+                     Replica las formulas de index.html. No opina.
+                     uso: python3 calc_finanzas.py db.json ANO MES [historico.json]
+
+reporte_finanzas.py  Arma el PDF a partir de analisis.json, que es la salida del
+                     anterior (clave "datos") mas los textos que escribe Claude.
+                     uso: python3 reporte_finanzas.py analisis.json salida.pdf
+
+El historico de patrimonio vive en Google Drive, en la carpeta
+"Reportes finanzas mensuales", porque la app borra los plazos fijos y metas al
+vencer y el patrimonio pasado no se puede reconstruir desde el JSON.

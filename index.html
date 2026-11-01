@@ -494,8 +494,8 @@ details[open] summary::before{transform:rotate(90deg);}
   <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;">
     <div class="card" style="--ca:#4fd1c5;"><div class="cl">Ingresos del Mes <span style="color:var(--ac)">(A)</span></div><div class="cv" id="k-ing">-</div><div class="cs">Salario + otros</div></div>
     <div class="card" style="--ca:#fc8181;"><div class="cl">Total Egresos <span style="color:var(--ac)">(B)</span></div><div class="cv" id="k-egr">-</div><div class="cs" id="k-egr-sub">efectivo + TC</div></div>
-    <div class="card" style="--ca:#f6ad55;"><div class="cl">Diferencia del Mes <span style="color:var(--ac)">(A − B)</span></div><div class="cv" id="k-dif">-</div><div class="cs" id="k-dif-t">Ingresos − Egresos</div></div>
-    <div class="card" style="--ca:#68d391;"><div class="cl">💵 Cash real <span style="color:var(--ac)">post-TC</span></div><div class="cv" id="k-sal">-</div><div class="cs">Cash fin de mes − TC pendiente</div></div>
+    <div class="card" style="--ca:#68d391;"><div class="cl">💵 Efectivo <span style="color:var(--ac)" id="k-ef-t">hoy</span></div><div class="cv" id="k-ef">-</div><div class="cs" id="k-ef-s">Lo que tienes disponible ahora</div></div>
+    <div class="card" style="--ca:#f6ad55;"><div class="cl"><span id="k-sal-l">📊 Proyección</span> <span style="color:var(--ac)" id="k-sal-t">fin de mes</span></div><div class="cv" id="k-sal">-</div><div class="cs" id="k-sal-s">Efectivo − gasto variable estimado − TC</div></div>
     <div class="card" style="--ca:var(--gold);"><div class="cl">Saldo Inicial <span style="color:var(--ac)">(C)</span></div><div class="cv mono" id="saldo-ini-display" style="font-size:20px;color:var(--gold);">-</div><div class="cs" style="margin-top:8px;"><span id="saldo-ini-lbl" style="font-size:10px;color:var(--tx3);display:block;margin-bottom:4px;">Saldo inicial de registro</span><button id="saldo-ini-btn" class="btn btn-g btn-sm" onclick="openModal('saldo')" style="font-size:11px;">✏️ Editar</button></div></div>
   </div>
 
@@ -769,7 +769,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v34';
+const APP_VERSION='v35';
 const APP_FECHA='2026-11-01';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
@@ -1639,6 +1639,25 @@ function totalAhorrosPendientes(yr,mi){
   return ahorrosPendientesMes(yr,mi).reduce((t,p)=>t+p.monto,0);
 }
 
+// Efectivo disponible AHORA: saldo inicial + lo cobrado − lo ya gastado y debitado.
+// No descuenta la TC del mes (ese dinero sigue en la cuenta hasta pagarla) ni el
+// gasto variable que todavía no ocurre. Es el número que el usuario puede verificar
+// contra su banco. La proyección de fin de mes se calcula a partir de este.
+function efectivoHoy(yr,mi){
+  const inicioDate=new Date(INICIO_TRACKING.a,MN.indexOf(INICIO_TRACKING.m),1);
+  const mesDate=new Date(yr,mi,1);
+  if(mesDate<inicioDate)return null;
+  const saldoIni=saldoInicialMes(yr,mi);
+  if(saldoIni===null)return null;
+  const h=db.hist.find(x=>x.a===yr&&x.m===MN[mi])||{ing:0,ev:0,imp:0,deu:0,aho:0};
+  const egrEf=(h.ev||0)+(h.imp||0)+(h.deu||0)+(h.aho||0);
+  const now=new Date();
+  const esMesActual=(yr===now.getFullYear()&&mi===now.getMonth());
+  // Ahorro del mes aún no registrado: el débito es automático, ya salió de la cuenta.
+  const ahoPend=esMesActual?totalAhorrosPendientes(yr,mi):0;
+  return saldoIni+((h.ing||0)-egrEf)-ahoPend+flujoInvMes(yr,mi).neto;
+}
+
 function cashRealFinMes(yr,mi){
   const _k=yr+'-'+mi;
   if(Object.prototype.hasOwnProperty.call(_cacheCash,_k)) return _cacheCash[_k];
@@ -1659,19 +1678,13 @@ function _cashRealFinMesCalc(yr,mi){
     const prev=cashRealFinMes(pYr,pMi);
     saldoIni=prev!==null?prev:(db.saldoInicial||0);
   }
-  const h=db.hist.find(x=>x.a===yr&&x.m===MN[mi])||{ing:0,ev:0,imp:0,deu:0,aho:0};
-  const ing=h.ing||0;
-  const egrEf=(h.ev||0)+(h.imp||0)+(h.deu||0)+(h.aho||0); // egresos en efectivo (sin TC)
   const tc=getTCEstado(yr,mi); // TC completa del estado de cuenta del mes
   // Variables proyectadas: solo si es el mes actual del calendario (mes en curso)
   const now=new Date();
   const esMesActual=(yr===now.getFullYear()&&mi===now.getMonth());
   const varProy=esMesActual?calcProyeccion().variablesProyectadas:0;
-  // Ahorro del mes aún no registrado: ya está comprometido (débito automático), así que
-  // no es cash disponible. Si el usuario ya lo anotó, esto da 0 y no se descuenta dos veces.
-  const ahoPend=esMesActual?totalAhorrosPendientes(yr,mi):0;
-  const flujo=flujoInvMes(yr,mi).neto; // retornos − reinversiones (fuera de A/B, sí es cash)
-  return saldoIni+(ing-egrEf)-varProy-ahoPend-tc+flujo;
+  const ef=efectivoHoy(yr,mi);
+  return (ef===null?saldoIni:ef)-varProy-tc;
 }
 // Saldo inicial (C) de un mes = cash real post-TC del mes anterior
 function saldoInicialMes(yr,mi){
@@ -1968,15 +1981,35 @@ function refreshDash(){
 
   document.getElementById('k-ing').textContent=fm(ing);
   document.getElementById('k-egr').textContent=fm(egrTotal);
-  const kd=document.getElementById('k-dif');
-  kd.textContent=fm(dif);kd.className='cv '+(dif>=0?'pos':'neg');
-  document.getElementById('k-dif-t').textContent=dif>=0?'✅ Resultado positivo':'❌ Resultado negativo';
+  // Efectivo: en el mes en curso es lo disponible hoy; en meses cerrados, el cierre.
+  const _nowK=new Date();
+  const _esMesActualK=(yr===_nowK.getFullYear()&&mi===_nowK.getMonth());
+  const _ef=efectivoHoy(yr,mi);
+  const kef=document.getElementById('k-ef');
+  if(kef){
+    kef.textContent=_ef===null?'—':fm(_ef);
+    kef.className='cv '+((_ef||0)>=0?'pos':'neg');
+    document.getElementById('k-ef-t').textContent=_esMesActualK?'hoy':'antes de TC';
+    document.getElementById('k-ef-s').textContent=_esMesActualK
+      ? 'Disponible ahora · mes '+(dif>=0?'en positivo ':'en negativo ')+fm(dif)
+      : 'Al cierre, sin descontar la TC del mes';
+  }
 
   // Cash Real Post-TC = fuente única de verdad (coincide con saldo inicial del mes siguiente)
   const _crp=cashRealFinMes(yr,mi); const cashRealPostTC=_crp!==null?_crp:0;
   const cashFinMesSinTC=cashRealPostTC+tc; // informativo (sin TC)
   const ks=document.getElementById('k-sal');
   ks.textContent=fm(cashRealPostTC);ks.className='cv '+(cashRealPostTC>=0?'pos':'neg');
+  const kss=document.getElementById('k-sal-s');
+  if(kss){
+    const _vp=_esMesActualK?calcProyeccion().variablesProyectadas:0;
+    const _kl=document.getElementById('k-sal-l'), _kt=document.getElementById('k-sal-t');
+    if(_kl)_kl.textContent=_esMesActualK?'📊 Proyección':'📊 Cierre';
+    if(_kt)_kt.textContent=_esMesActualK?'fin de mes':'post-TC';
+    kss.textContent=_esMesActualK
+      ? 'Efectivo − '+fm(_vp)+' estimado − '+fm(tc)+' TC'
+      : 'Lo que arrastra al mes siguiente';
+  }
   // Update p-cash in 40-30-30 bar
   const _pcEl=document.getElementById('p-cash');
   if(_pcEl&&ing>0){
@@ -3883,6 +3916,32 @@ const CAT_FIJOS=[
 const CAT_VARIABLES=['Alimentación','Combustible','Parqueadero','Movilización','Salud','Entretenimiento','Educación'];
 const UMBRAL_OTROS=100; // Si "Otros" supera este monto, se trata como fijo
 
+// Mediana del gasto variable diario de los meses cerrados anteriores. Mediana y no
+// promedio: un mes atípico no arrastra la estimación. Misma clasificación que
+// calcProyeccion ("Otros" pequeños cuentan como variable) para que sean comparables.
+function medianaDiariaVariablesHist(year,month,nMeses){
+  const ini=new Date(INICIO_TRACKING.a,MN.indexOf(INICIO_TRACKING.m),1);
+  const ratios=[];
+  for(let k=1;k<=(nMeses||6);k++){
+    let y=year,m=month-k;
+    while(m<0){m+=12;y--;}
+    if(new Date(y,m,1)<ini)break;
+    let tot=0;
+    (db.movimientos||[]).forEach(mv=>{
+      if(mv.tipo!=='egreso'||esFlujoInv(mv))return;
+      const esVar=CAT_VARIABLES.includes(mv.categoria)||(mv.categoria==='Otros'&&mv.monto<UMBRAL_OTROS);
+      if(!esVar)return;
+      const d=parseLocalDate(mv.fecha);
+      if(d.getFullYear()===y&&d.getMonth()===m)tot+=mv.monto||0;
+    });
+    if(tot>0)ratios.push(tot/new Date(y,m+1,0).getDate());
+  }
+  if(!ratios.length)return 0;
+  ratios.sort((a,b)=>a-b);
+  const n=ratios.length;
+  return n%2?ratios[(n-1)/2]:(ratios[n/2-1]+ratios[n/2])/2;
+}
+
 function calcProyeccion(){
   const now=new Date();
   const year=now.getFullYear();
@@ -3930,7 +3989,13 @@ function calcProyeccion(){
     detalleFijos['💳 TC BG']=(detalleFijos['💳 TC BG']||0)+tcMes;
   }
 
-  const ritmoDiarioVariables=diaActual>0?gastosVariables/diaActual:0;
+  // El ritmo del propio mes no sirve al inicio: el día 1, un gasto de $23 proyectaba
+  // $681 para el mes, más del doble de cualquier mes real. Se mezcla con la mediana
+  // diaria de los meses anteriores, dando peso al mes en curso conforme avanza.
+  const ritmoMes=diaActual>0?gastosVariables/diaActual:0;
+  const ritmoHist=medianaDiariaVariablesHist(year,month,6);
+  const pesoMes=Math.min(1,diaActual/diasMes);
+  const ritmoDiarioVariables=ritmoHist>0?(pesoMes*ritmoMes+(1-pesoMes)*ritmoHist):ritmoMes;
   const variablesProyectadas=ritmoDiarioVariables*diasRestantes;
   const egrProyectado=gastosFijos+gastosVariables+gastosImprevistos+variablesProyectadas;
 

@@ -248,16 +248,23 @@ details[open] summary::before{transform:rotate(90deg);}
         <label>Categoría</label>
         <select id="rCatEgr" onchange="onCatChange()">
           <optgroup label="── ESTILO DE VIDA ──">
-            <option value="Alimentación">🍽️ Alimentación</option>
             <option value="Combustible">　├ ⛽ Combustible</option>
             <option value="Parqueadero">　├ 🅿️ Parqueadero</option>
             <option value="Mantenimiento Vehículo">　├ 🔧 Mantenimiento Vehículo</option>
             <option value="Movilización">　└ 🛵 Movilización</option>
             <option value="Entretenimiento">🎭 Entretenimiento</option>
-            <option value="Educación">📚 Educación</option>
+            <option value="Tecnología">💻 Tecnología</option>
+            <option value="Hogar">🛠️ Hogar</option>
+            <option value="Suscripciones">📺 Suscripciones</option>
+            <option value="Otros">📦 Otros</option>
+          </optgroup>
+          <optgroup label="── DEDUCIBLES SRI ──">
+            <option value="Alimentación">🍽️ Alimentación</option>
             <option value="Salud">💊 Salud</option>
             <option value="Vivienda">🏠 Vivienda</option>
-            <option value="Otros">📦 Otros</option>
+            <option value="Vestimenta">👕 Vestimenta</option>
+            <option value="Educación y cultura">📚 Educación y cultura</option>
+            <option value="Turismo">✈️ Turismo (nacional)</option>
           </optgroup>
           <optgroup label="── IMPREVISTOS ──">
             <option value="Imprevistos">⚡ Imprevistos</option>
@@ -547,6 +554,9 @@ details[open] summary::before{transform:rotate(90deg);}
     </div>
   </div>
 
+  <!-- Deducibles del año (SRI) -->
+  <div id="deducibles-dash" style="margin-top:18px;"></div>
+
 </div>
 
 <!-- ═══════════════ REGISTRO ═══════════════ -->
@@ -769,7 +779,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v35';
+const APP_VERSION='v36';
 const APP_FECHA='2026-11-01';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
@@ -898,6 +908,7 @@ async function load(opts){
       migrarRetornosV1();
       migrarTransporteV27();
       migrarRecargoV34();
+      migrarCategoriasV36();
       if(vincularLotesGanaderia())save();
       recalcTodo();
       setSyncStatus('synced','✓ Sincronizado con Drive · '+new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}));
@@ -914,6 +925,7 @@ async function load(opts){
   migrarRetornosV1();
   migrarTransporteV27();
   migrarRecargoV34();
+  migrarCategoriasV36();
   vincularLotesGanaderia();
   recalcTodo(); // faltaba: sin esto el Dashboard mostraba el hist viejo de localStorage
 }
@@ -967,6 +979,7 @@ function importarRespaldo(input){
     migrarRetornosV1();
     migrarTransporteV27();
     migrarRecargoV34();
+    migrarCategoriasV36();
     vincularLotesGanaderia();
     recalcTodo();
     save();
@@ -1122,6 +1135,42 @@ function vincularLotesGanaderia(){
   });
   return cambio;
 }
+// Reclasifica a las categorías alineadas con el SRI (v36). Solo cambia lo que una regla
+// de comercio reconoce con certeza, o los nombres que dejaron de existir. Un movimiento
+// cuya descripción no matchea ninguna regla se queda donde está: es preferible dejarlo
+// en su categoría vieja que moverlo mal.
+function migrarCategoriasV36(){
+  if(db._migCatV36)return;
+  const RENOMBRES={'Educación':'Educación y cultura'};
+  // categorías de las que SÍ vale la pena sacar un movimiento si el comercio lo aclara
+  const REVISABLES=['Otros','Compras Online','Vivienda','Entretenimiento','Alimentación'];
+  let nMov=0,nTc=0;
+  const nuevaCat=(cat,desc)=>{
+    if(RENOMBRES[cat])cat=RENOMBRES[cat];
+    if(REVISABLES.includes(cat)){
+      const inf=tcInferirCategoria(desc||'');
+      if(inf!=='Otros'&&inf!==cat)return inf;
+    }
+    if(cat==='Compras Online')return 'Tecnología'; // sin pista: el canal más probable
+    return cat;
+  };
+  (db.movimientos||[]).forEach(m=>{
+    if(m.tipo!=='egreso'||esFlujoInv(m))return;
+    const c=nuevaCat(m.categoria,m.descripcion);
+    if(c!==m.categoria){m.categoria=c;nMov++;}
+  });
+  (db.tcPagos||[]).forEach(p=>{
+    (p.detalle||[]).forEach(d=>{
+      const c=nuevaCat(d.categoria,d.descripcion);
+      if(c!==d.categoria){d.categoria=c;nTc++;}
+    });
+  });
+  db._migCatV36=true;
+  if(nMov||nTc)console.log('[Migración v36] '+nMov+' movimientos y '+nTc+' consumos de TC reclasificados');
+  recalcTodo();
+  save(); // la migración muta db: debe persistir o se revierte al recargar
+}
+
 // Los $6 que cobra la cooperativa salen del efectivo pero no son ahorro del usuario.
 // Se registran como recargo de la meta para que el esperado dé 906 y no 900.
 function migrarRecargoV34(){
@@ -1274,7 +1323,12 @@ function setTipo(t){
 // ════════════════════════════════════════
 //  CATEGORÍAS
 // ════════════════════════════════════════
-const CAT_EV=['Alimentación','Combustible','Parqueadero','Movilización','Entretenimiento','Educación','Salud','Vivienda','Suscripciones','Compras Online','Otros'];
+const CAT_EV=['Alimentación','Combustible','Parqueadero','Movilización','Entretenimiento','Educación y cultura','Salud','Vivienda','Vestimenta','Turismo','Tecnología','Hogar','Suscripciones','Otros'];
+// Las seis categorías que el SRI acepta como gasto personal deducible. 'Compras Online'
+// se eliminó: era un canal de compra, no un tipo de gasto, y escondía ropa, libros y
+// equipos en la misma bolsa. Ojo: deducir exige factura electrónica a nombre del
+// contribuyente; esto solo mide el gasto potencialmente deducible.
+const CAT_DEDUCIBLES=['Vivienda','Alimentación','Salud','Educación y cultura','Vestimenta','Turismo'];
 const CAT_TRANSPORTE=['Transporte','Combustible','Parqueadero','Movilización']; // subcategorías transporte
 const CAT_IMP=['Imprevistos','Gastos Ganado','Ganado','Mantenimiento Vehículo'];
 const CAT_DEU=['Crédito','Pago de Carro']; // TC ya no es un movimiento — va a db.tcPagos
@@ -1902,6 +1956,62 @@ let pieC;
 //  Propone los aportes que aún no están registrados; NO los crea solo. El usuario
 //  revisa los montos, los edita si ese mes cambió algo, y confirma.
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+//  DEDUCIBLES DEL AÑO (SRI)
+//  Suma, por categoría deducible, el gasto en efectivo y el de tarjeta del año.
+//  Los consumos de tarjeta no viven en db.movimientos sino en el detalle de
+//  db.tcPagos, así que hay que sumarlos aparte; por eso no hay doble conteo.
+// ════════════════════════════════════════
+function deduciblesAnio(yr){
+  const out={}; CAT_DEDUCIBLES.forEach(c=>out[c]={efectivo:0,tc:0,total:0});
+  (db.movimientos||[]).forEach(m=>{
+    if(m.tipo!=='egreso'||esFlujoInv(m))return;
+    if(!out[m.categoria])return;
+    if(parseLocalDate(m.fecha).getFullYear()!==yr)return;
+    out[m.categoria].efectivo+=m.monto||0;
+  });
+  (db.tcPagos||[]).forEach(p=>{
+    (p.detalle||[]).forEach(d=>{
+      if(!out[d.categoria])return;
+      if(!d.fecha||parseLocalDate(d.fecha).getFullYear()!==yr)return;
+      out[d.categoria].tc+=d.monto||0;
+    });
+  });
+  let tot=0;
+  Object.keys(out).forEach(c=>{out[c].total=Math.round((out[c].efectivo+out[c].tc)*100)/100;tot+=out[c].total;});
+  return {cats:out,total:Math.round(tot*100)/100};
+}
+
+function renderDeducibles(){
+  const el=document.getElementById('deducibles-dash'); if(!el)return;
+  const yr=parseInt(document.getElementById('dYear')?.value)||new Date().getFullYear();
+  const d=deduciblesAnio(yr);
+  const ICO={'Vivienda':'🏠','Alimentación':'🍽️','Salud':'💊','Educación y cultura':'📚','Vestimenta':'👕','Turismo':'✈️'};
+  const filas=CAT_DEDUCIBLES.map(c=>({cat:c,...d.cats[c]})).sort((a,b)=>b.total-a.total);
+  const max=Math.max(1,...filas.map(f=>f.total));
+  const rebaja=d.total*0.18;
+  el.innerHTML=`<div class="card" style="--ca:#4fd1c5;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+      <div class="cl" style="margin:0;">🧾 Gasto deducible ${yr} — SRI</div>
+      <div style="font-family:'DM Mono',monospace;font-size:17px;color:var(--ac);font-weight:700;">${fm(d.total)}</div>
+    </div>
+    <div style="font-size:10.5px;color:var(--tx3);margin-bottom:12px;">Efectivo + tarjeta. Solo cuenta para el SRI lo que tenga factura electrónica a tu nombre.</div>
+    ${filas.map(f=>`<div style="margin-bottom:7px;">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
+        <span>${ICO[f.cat]||''} ${esc(f.cat)}</span>
+        <span class="mono" style="color:var(--tx2);">${fm(f.total)}${f.tc>0?` <span style="font-size:9.5px;color:var(--tx3);">(TC ${fm(f.tc)})</span>`:''}</span>
+      </div>
+      <div style="height:5px;background:var(--sf2);border-radius:3px;overflow:hidden;">
+        <div style="height:100%;width:${(f.total/max*100).toFixed(1)}%;background:var(--ac);border-radius:3px;"></div>
+      </div>
+    </div>`).join('')}
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:11px;color:var(--tx3);">
+      Rebaja estimada al 18%: <strong style="color:var(--ok);font-family:'DM Mono',monospace;">${fm(rebaja)}</strong>
+      · el SRI aplica el menor entre ese 18% y el tope por canasta básica según tus cargas familiares.
+    </div>
+  </div>`;
+}
+
 function renderAhorrosPend(){
   const el=document.getElementById('ahorros-dash');
   if(!el)return;
@@ -1965,6 +2075,7 @@ function refreshDash(){
   document.getElementById('dashLabel').textContent=mn+' '+yr;
   document.getElementById('egr-lbl').textContent=mn+' '+yr;
   renderAhorrosPend();
+  renderDeducibles();
   const h=db.hist.find(x=>x.a===yr&&x.m===mn)||{ing:0,ev:0,imp:0,deu:0,aho:0};
   const ing=h.ing||0,ev=h.ev||0,imp=h.imp||0,deu=h.deu||0,aho=h.aho||0;
   const tc=getTCEstado(yr,mi); // TC del mes (lump sum, fuera del 40-30-30)
@@ -2187,7 +2298,7 @@ function renderEstiloVida(){
 
   // ── 3. Agrupar subcategorías de Transporte bajo grupo "🚌 Transporte" ──
   // Las categorías que se muestran como filas independientes (no son subcat de transporte)
-  const CATS_RAIZ = ['Alimentación','Entretenimiento','Educación','Salud','Vivienda','Suscripciones','Compras Online','Otros'];
+  const CATS_RAIZ = ['Alimentación','Entretenimiento','Educación y cultura','Salud','Vivienda','Vestimenta','Turismo','Tecnología','Hogar','Suscripciones','Otros'];
   // Grupo Transporte: suma todas las subcategorías
   const transpEf  = CAT_TRANSPORTE.reduce((s,c)=>s+(efCat[c]||0), 0);
   const transpTc  = CAT_TRANSPORTE.reduce((s,c)=>s+(tcCat[c]||0), 0);
@@ -2251,8 +2362,9 @@ function renderEstiloVida(){
   const icons = {
     'Alimentación':'🍽️','Transporte':'🚌','Combustible':'⛽','Parqueadero':'🅿️',
     'Mantenimiento Vehículo':'🔧','Movilización':'🛵',
-    'Entretenimiento':'🎭','Educación':'📚','Salud':'💊','Vivienda':'🏠',
-    'Suscripciones':'📺','Compras Online':'🛒','Otros':'📦'
+    'Entretenimiento':'🎭','Educación y cultura':'📚','Salud':'💊','Vivienda':'🏠',
+    'Vestimenta':'👕','Turismo':'✈️','Tecnología':'💻','Hogar':'🛠️',
+    'Suscripciones':'📺','Otros':'📦'
   };
 
   rows.forEach(x=>{
@@ -2371,7 +2483,8 @@ function renderDesgloseVsMesAnterior(yr,mi,rows,totalEV){
 
   const icons={'Alimentación':'🍽️','Transporte':'🚌','Combustible':'⛽','Parqueadero':'🅿️',
     'Movilización':'🛵','Entretenimiento':'🎭','Educación':'📚','Salud':'💊','Vivienda':'🏠',
-    'Suscripciones':'📺','Compras Online':'🛒','Otros':'📦'};
+    'Vestimenta':'👕','Turismo':'✈️','Tecnología':'💻','Hogar':'🛠️',
+    'Suscripciones':'📺','Otros':'📦'};
 
   return `
   <div style="border-top:1px solid rgba(255,255,255,.07);margin-top:14px;padding-top:14px;">
@@ -3913,7 +4026,7 @@ const CAT_FIJOS=[
 ];
 // NOTA: 'Otros' se trata como fijo si supera el umbral de $100
 // porque generalmente es un gasto extraordinario puntual
-const CAT_VARIABLES=['Alimentación','Combustible','Parqueadero','Movilización','Salud','Entretenimiento','Educación'];
+const CAT_VARIABLES=['Alimentación','Combustible','Parqueadero','Movilización','Salud','Entretenimiento','Educación y cultura'];
 const UMBRAL_OTROS=100; // Si "Otros" supera este monto, se trata como fijo
 
 // Mediana del gasto variable diario de los meses cerrados anteriores. Mediana y no
@@ -4786,11 +4899,17 @@ const TC_CAT_MAP=[
   {cat:'Parqueadero',keys:['PARKING','PARQUEO','PARQUEADERO']},
   {cat:'Movilización',keys:['UBER','CABIFY','TAXI','AUTOLAVADO']},
   {cat:'Alimentación',keys:['JUAN VALDEZ','RESTAURAN','KFC','MCDONALD','SUBWAY','BURGER','PIZZA','SUSHI','POLLO','CAFE ','CAFETER','SUPERMAXI','MEGAMAXI','SANTA MARIA','GRAN AKI','TIA ','CORAL','COMISARIATO','SWEET','PASTELER']},
-  {cat:'Entretenimiento',keys:['MULTICINES','SALSOTECA','CINE','BAR ','DISCOTECA','BOWLING','PARQUE ACUAT','ENTRETENIMIEN','PLAY','GAME']},
-  {cat:'Salud',keys:['FYBECA','SANA SANA','FARMA','CRUZ AZUL','MEDIC','CLINICA','HOSPITAL','LABORATORIO','DENTIST','OPTIC']},
+  // Cine, libros y museos van a Educación y cultura, no a Entretenimiento: el SRI los
+  // acepta como deducibles dentro de "educación, arte y cultura".
+  {cat:'Educación y cultura',keys:['MULTICINE','CINEMARK','SUPERCINES','CINE ','MR.BOOKS','MR BOOKS','LIBRERIA','LIBRI','MUSEO','TEATRO','UDEMY','COURSERA','PLATZI','UNIVERSIDAD','COLEGIO','INSTITUTO','PAPELERIA','JUAN MARCET']},
+  {cat:'Entretenimiento',keys:['SALSOTECA','BAR ','DISCOTECA','BOWLING','PARQUE ACUAT','ENTRETENIMIEN','PLAY','GAME','SHAMANBEER','CERVEC']},
+  {cat:'Salud',keys:['FYBECA','SANA SANA','FARMA','DIFARE','CRUZ AZUL','MEDIC','CLINICA','HOSPITAL','LABORATORIO','DENTIST','OPTIC','VETERINAR']},
+  {cat:'Vestimenta',keys:['DARWIN AND WOLF','DE PRATI','MUNDO DEPORTIVO','MEDEPORT','KAO SPORT','NIKE','ADIDAS','PUMA','PATAS AZULES','ETAFASHION','BERSHKA','ZARA','PASA ','BOUTIQUE','CALZADO','MARATHON','TENNIS','MODA','TEXTIL']},
+  {cat:'Turismo',keys:['HOTEL','HOSTAL','HOSTERIA','HOSPEDAJE','AVIANCA','LATAM','AEROGAL','AEROLANE','AGENCIA DE VIAJE','TURISMO','RESORT']},
   {cat:'Suscripciones',keys:['CLAUDE','ANTHROPIC','SPOTIFY','NETFLIX','NETLIFY','AMAZON PRIME','GOOGLE ONE','APPLE SUB','MICROSOFT 365','YOUTUBE PREMIUM','CHATGPT','OPENAI']},
-  {cat:'Compras Online',keys:['AMAZON','ALIEXPRESS','MERCADO LIBRE','NOVICOMPU','COMPUTRON','TECNOMEGA']},
-  {cat:'Educación',keys:['UDEMY','COURSERA','PLATZI','UNIVERSIDAD','COLEGIO','INSTITUTO']},
+  {cat:'Tecnología',keys:['PMZ MIRGOR','SONY','MUNDO DISPLAY','NOVICOMPU','COMPUTRON','TECNOMEGA','XIAOMI','SAMSUNG','APPLE STORE','ALIEXPRESS','AMAZON','MERCADO LIBRE']},
+  {cat:'Hogar',keys:['KYWI','FERRISARIATO','DISENSA','SUKASA','MUNDO HOGAR','HOME VEGA','PINTURAS','FERRETER']},
+  {cat:'Ganado',keys:['AGRIPAC','AGROTA','BALANCEADO','VETERINARIA AGRO']},
 ];
 
 function tcInferirCategoria(desc){
@@ -4801,7 +4920,7 @@ function tcInferirCategoria(desc){
   return 'Otros';
 }
 
-const TC_CATS=['Combustible','Parqueadero','Movilización','Alimentación','Entretenimiento','Salud','Suscripciones','Compras Online','Educación','Imprevistos','Otros'];
+const TC_CATS=['Alimentación','Salud','Vestimenta','Educación y cultura','Vivienda','Turismo','Combustible','Parqueadero','Movilización','Entretenimiento','Tecnología','Hogar','Suscripciones','Imprevistos','Otros'];
 
 function tcRenderValidacion(data){
   tcActualizarChips(data.transacciones);

@@ -9,14 +9,15 @@ textos que escribe Claude (semaforo, titular, txt_*, recomendaciones, alertas).
 Uso:  python3 reporte_finanzas.py analisis.json salida.pdf
 
 Sin emojis: la fuente base del PDF no los dibuja.
+
+El grafico se dibuja vectorial con reportlab, no como imagen: un PNG incrustado
+pesaba 45 KB y volvia inviable subir el PDF a Drive (hay que codificarlo a texto
+y son decenas de miles de caracteres). Vectorial pesa una fraccion y se ve mejor
+al hacer zoom. Por eso este script NO usa matplotlib.
 """
 import json, sys, os, textwrap
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as rl_canvas
 
 W, H = A4
@@ -81,37 +82,61 @@ def titulo_seccion(c, x, y, txt):
     return y - 8 * mm
 
 
-def grafico_tc(cats, path):
-    """Barras horizontales: gasto por categoria, mes vs mes anterior."""
-    cats = [c for c in cats if c['mes'] or c['anterior']][:8]
+def grafico_tc(c, x, y, w, cats):
+    """Barras horizontales vectoriales: gasto por categoria, mes vs mes anterior.
+    Dibuja directamente en el canvas y devuelve la altura ocupada."""
+    cats = [k for k in cats if k['mes'] or k['anterior']][:8]
     if not cats:
-        return None
-    cats = cats[::-1]
-    etiquetas = [c['categoria'][:18] for c in cats]
-    mes = [c['mes'] for c in cats]
-    ant = [c['anterior'] for c in cats]
-    n = len(cats)
-    fig, ax = plt.subplots(figsize=(7.1, max(2.0, 0.46 * n + 0.6)), dpi=190)
-    ypos = range(n)
-    ax.barh([y + 0.20 for y in ypos], mes, height=0.38, color='#059669', label='Este mes')
-    ax.barh([y - 0.20 for y in ypos], ant, height=0.38, color='#cbd5d8', label='Mes anterior')
-    ax.set_yticks(list(ypos))
-    ax.set_yticklabels(etiquetas, fontsize=8.5)
-    ax.tick_params(axis='x', labelsize=8)
-    for s in ('top', 'right', 'left'):
-        ax.spines[s].set_visible(False)
-    ax.grid(axis='x', color='#e6eaec', linewidth=0.7)
-    ax.set_axisbelow(True)
-    lim = max(mes + ant + [1]) * 1.18
-    ax.set_xlim(0, lim)
-    for i, v in enumerate(mes):
-        if v:
-            ax.text(v + lim * 0.012, i + 0.20, money(v), va='center', fontsize=7.6, color='#047857')
-    ax.legend(loc='lower right', fontsize=8, frameon=False)
-    fig.tight_layout(pad=0.4)
-    fig.savefig(path, transparent=True)
-    plt.close(fig)
-    return path
+        return 0
+    LAB = 40 * mm                      # ancho de la columna de etiquetas
+    fila = 8.6 * mm
+    alto = fila * len(cats) + 7 * mm
+    gx = x + LAB
+    gw = w - LAB - 16 * mm             # espacio para el valor a la derecha
+    top = y
+    lim = max([k['mes'] for k in cats] + [k['anterior'] for k in cats] + [1])
+
+    # lineas de referencia verticales
+    c.setStrokeColorRGB(0.90, 0.92, 0.93)
+    c.setLineWidth(0.5)
+    for i in range(5):
+        xx = gx + gw * i / 4.0
+        c.line(xx, top - alto + 4 * mm, xx, top + 1 * mm)
+
+    for i, k in enumerate(cats):
+        fy = top - (i + 1) * fila + 2.4 * mm
+        c.setFillColorRGB(*TINTA)
+        c.setFont('Helvetica', 8.6)
+        etiqueta = k['categoria']
+        while c.stringWidth(etiqueta, 'Helvetica', 8.6) > LAB - 4 * mm and len(etiqueta) > 4:
+            etiqueta = etiqueta[:-1]
+        c.drawString(x, fy + 1.6 * mm, etiqueta)
+        # mes anterior (gris, abajo)
+        wa = gw * (k['anterior'] / lim)
+        if wa > 0:
+            c.setFillColorRGB(0.80, 0.84, 0.85)
+            c.rect(gx, fy - 0.6 * mm, wa, 2.4 * mm, stroke=0, fill=1)
+        # este mes (verde, arriba)
+        wm = gw * (k['mes'] / lim)
+        if wm > 0:
+            c.setFillColorRGB(0.02, 0.59, 0.41)
+            c.rect(gx, fy + 2.4 * mm, wm, 2.4 * mm, stroke=0, fill=1)
+            c.setFillColorRGB(*VERDE)
+            c.setFont('Helvetica', 7.4)
+            c.drawString(gx + wm + 1.5 * mm, fy + 2.8 * mm, money(k['mes']))
+
+    # leyenda
+    ly = top - alto + 1 * mm
+    c.setFillColorRGB(0.02, 0.59, 0.41)
+    c.rect(gx, ly, 4 * mm, 2.2 * mm, stroke=0, fill=1)
+    c.setFillColorRGB(*GRIS)
+    c.setFont('Helvetica', 7.4)
+    c.drawString(gx + 5.5 * mm, ly + 0.3 * mm, 'Este mes')
+    c.setFillColorRGB(0.80, 0.84, 0.85)
+    c.rect(gx + 22 * mm, ly, 4 * mm, 2.2 * mm, stroke=0, fill=1)
+    c.setFillColorRGB(*GRIS)
+    c.drawString(gx + 27.5 * mm, ly + 0.3 * mm, 'Mes anterior')
+    return alto
 
 
 def barra_progreso(c, x, y, w, pct):
@@ -185,15 +210,9 @@ def main():
 
     # ── Tarjeta de crédito ──
     y = titulo_seccion(c, M, y, 'En qué se fue la tarjeta')
-    img = grafico_tc(tar['por_categoria'], os.path.join(os.path.dirname(salida) or '.', '_tc.png'))
-    if img:
-        ir = ImageReader(img)
-        iw, ih = ir.getSize()
-        gw = W - 2 * M
-        gh = gw * ih / iw
-        gh = min(gh, 66 * mm)
-        c.drawImage(ir, M, y - gh, width=gw, height=gh, mask='auto')
-        y -= gh + 5 * mm
+    gh = grafico_tc(c, M, y, W - 2 * M, tar['por_categoria'])
+    if gh:
+        y -= gh + 4 * mm
     y = wrap(c, an.get('txt_tarjeta', ''), M, y, W - 2 * M)
     y -= 4 * mm
 

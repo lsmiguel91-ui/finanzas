@@ -247,6 +247,14 @@ details[open] summary::before{transform:rotate(90deg);}
       <div class="fg" id="catEgrGrp">
         <label>Categoría</label>
         <select id="rCatEgr" onchange="onCatChange()">
+          <optgroup label="── DEDUCIBLES SRI ──">
+            <option value="Alimentación">🍽️ Alimentación</option>
+            <option value="Salud">💊 Salud</option>
+            <option value="Vivienda">🏠 Vivienda</option>
+            <option value="Vestimenta">👕 Vestimenta</option>
+            <option value="Educación y cultura">📚 Educación y cultura</option>
+            <option value="Turismo">✈️ Turismo (nacional)</option>
+          </optgroup>
           <optgroup label="── ESTILO DE VIDA ──">
             <option value="Combustible">　├ ⛽ Combustible</option>
             <option value="Parqueadero">　├ 🅿️ Parqueadero</option>
@@ -257,14 +265,6 @@ details[open] summary::before{transform:rotate(90deg);}
             <option value="Hogar">🛠️ Hogar</option>
             <option value="Suscripciones">📺 Suscripciones</option>
             <option value="Otros">📦 Otros</option>
-          </optgroup>
-          <optgroup label="── DEDUCIBLES SRI ──">
-            <option value="Alimentación">🍽️ Alimentación</option>
-            <option value="Salud">💊 Salud</option>
-            <option value="Vivienda">🏠 Vivienda</option>
-            <option value="Vestimenta">👕 Vestimenta</option>
-            <option value="Educación y cultura">📚 Educación y cultura</option>
-            <option value="Turismo">✈️ Turismo (nacional)</option>
           </optgroup>
           <optgroup label="── IMPREVISTOS ──">
             <option value="Imprevistos">⚡ Imprevistos</option>
@@ -297,6 +297,11 @@ details[open] summary::before{transform:rotate(90deg);}
         </select>
       </div>
       <div class="fg"><label>Descripción (opcional)</label><input type="text" id="rDesc" placeholder="ej: almuerzo, gasolina, pago mensual..."/></div>
+      <!-- Solo las categorías deducibles la muestran: el SRI exige factura electrónica -->
+      <label id="rFacturaGrp" style="display:none;align-items:center;gap:8px;padding:9px 11px;background:rgba(79,209,197,.07);border:1px solid rgba(79,209,197,.25);border-radius:9px;margin-top:4px;cursor:pointer;">
+        <input type="checkbox" id="rFactura" checked style="width:17px;height:17px;accent-color:var(--ac);cursor:pointer;"/>
+        <span style="font-size:12px;">🧾 Con factura a mi nombre <span style="color:var(--tx3);">— desmárcalo si no te la dieron</span></span>
+      </label>
       <div style="display:flex;gap:6px;margin-top:10px;">
         <button class="btn btn-p" id="btnGuardar" onclick="guardarOActualizar()" style="flex:1">💾 Guardar</button>
         <button class="btn btn-g" id="btnCancelar" onclick="cancelarEdicion()">✕</button>
@@ -779,7 +784,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v38';
+const APP_VERSION='v39';
 const APP_FECHA='2026-11-01';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
@@ -910,6 +915,7 @@ async function load(opts){
       migrarRecargoV34();
       migrarCategoriasV36();
       migrarFechasTCV38();
+      migrarFacturaV39();
       if(vincularLotesGanaderia())save();
       recalcTodo();
       setSyncStatus('synced','✓ Sincronizado con Drive · '+new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}));
@@ -928,6 +934,7 @@ async function load(opts){
   migrarRecargoV34();
   migrarCategoriasV36();
   migrarFechasTCV38();
+  migrarFacturaV39();
   vincularLotesGanaderia();
   recalcTodo(); // faltaba: sin esto el Dashboard mostraba el hist viejo de localStorage
 }
@@ -983,6 +990,7 @@ function importarRespaldo(input){
     migrarRecargoV34();
     migrarCategoriasV36();
     migrarFechasTCV38();
+    migrarFacturaV39();
     vincularLotesGanaderia();
     recalcTodo();
     save();
@@ -1138,6 +1146,23 @@ function vincularLotesGanaderia(){
   });
   return cambio;
 }
+// Criterio acordado para lo ya registrado: lo pagado con TARJETA tiene factura
+// electrónica (el comercio la emite), lo pagado en EFECTIVO no (la comida del
+// reparto, por ejemplo, no da comprobante). De aquí en adelante cada registro lo
+// decide la casilla del formulario; esto solo ordena el histórico una vez.
+function migrarFacturaV39(){
+  if(db._migFacturaV39)return;
+  let n=0;
+  (db.movimientos||[]).forEach(m=>{
+    if(m.tipo!=='egreso'||esFlujoInv(m))return;
+    if(!CAT_DEDUCIBLES.includes(m.categoria))return;
+    if(m.sinFactura===undefined){m.sinFactura=true;n++;}
+  });
+  db._migFacturaV39=true;
+  if(n)console.log('[Migración v39] '+n+' egresos en efectivo marcados sin factura');
+  save();
+}
+
 // Repara los estados de cuenta importados con fecha equivocada (bug corregido en v38):
 // el año salía del corte aunque la línea fuera de un año anterior, y las cuotas de
 // diferidos se imputaban al mes de la compra. Todo es deducible del propio registro:
@@ -1450,6 +1475,9 @@ function guardar(){
   const cat=tipo==='egreso'?document.getElementById('rCatEgr').value:document.getElementById('rCatIng').value;
   if(!f||!m||m<=0){toast('⚠️ Completa fecha y monto',false);return;}
   const mov={id:Date.now(),fecha:f,monto:m,categoria:cat,descripcion:d,tipo};
+  // Sin factura no es deducible aunque la categoría lo sea. Se guarda solo la
+  // excepción: ausente = con factura.
+  if(tipo==='egreso'&&CAT_DEDUCIBLES.includes(cat)&&!document.getElementById('rFactura')?.checked)mov.sinFactura=true;
   if(cat==='Reinversión')mov.flujoInv=true;
   db.movimientos.unshift(mov);
   const dd=parseLocalDate(f);
@@ -1462,6 +1490,8 @@ function limpiarReg(){
   document.getElementById('rFecha').value=today();
   document.getElementById('rMonto').value='';
   document.getElementById('rDesc').value='';
+  const _fac=document.getElementById('rFactura');
+  if(_fac)_fac.checked=true;   // por defecto con factura: es lo habitual
 }
 
 function eliminarMov(id){
@@ -1486,6 +1516,9 @@ function editarMov(id){
   setTipo(mov.tipo);
   if(mov.tipo==='egreso') document.getElementById('rCatEgr').value=mov.categoria;
   else document.getElementById('rCatIng').value=mov.categoria;
+  const _fac=document.getElementById('rFactura');
+  if(_fac)_fac.checked=!mov.sinFactura;
+  onCatChange();
   // Cambiar botón Guardar a modo edición
   document.getElementById('btnGuardar').textContent='💾 Actualizar';
   document.getElementById('btnGuardar').style.background='var(--warn)';
@@ -1505,6 +1538,8 @@ function guardarOActualizar(){
     // Actualizar el movimiento
     const idx=db.movimientos.findIndex(x=>x.id===editingMovId);
     const nuevo={...(movViejo||{}),id:editingMovId,fecha:f,monto:m,categoria:cat,descripcion:d,tipo};
+    if(tipo==='egreso'&&CAT_DEDUCIBLES.includes(cat)&&!document.getElementById('rFactura')?.checked)nuevo.sinFactura=true;
+    else delete nuevo.sinFactura;
     if(cat==='Reinversión')nuevo.flujoInv=true;
     else if(nuevo.flujoInv&&!(tipo==='ingreso'&&cat==='Retorno Inversión'))delete nuevo.flujoInv;
     db.movimientos[idx]=nuevo;
@@ -2027,23 +2062,29 @@ let pieC;
 //  db.tcPagos, así que hay que sumarlos aparte; por eso no hay doble conteo.
 // ════════════════════════════════════════
 function deduciblesAnio(yr){
-  const out={}; CAT_DEDUCIBLES.forEach(c=>out[c]={efectivo:0,tc:0,total:0});
+  const out={}; CAT_DEDUCIBLES.forEach(c=>out[c]={efectivo:0,tc:0,total:0,conFactura:0});
   (db.movimientos||[]).forEach(m=>{
     if(m.tipo!=='egreso'||esFlujoInv(m))return;
     if(!out[m.categoria])return;
     if(parseLocalDate(m.fecha).getFullYear()!==yr)return;
     out[m.categoria].efectivo+=m.monto||0;
+    if(!m.sinFactura)out[m.categoria].conFactura+=m.monto||0;
   });
   (db.tcPagos||[]).forEach(p=>{
     (p.detalle||[]).forEach(d=>{
       if(!out[d.categoria])return;
       if(!d.fecha||parseLocalDate(d.fecha).getFullYear()!==yr)return;
       out[d.categoria].tc+=d.monto||0;
+      if(!d.sinFactura)out[d.categoria].conFactura+=d.monto||0;
     });
   });
-  let tot=0;
-  Object.keys(out).forEach(c=>{out[c].total=Math.round((out[c].efectivo+out[c].tc)*100)/100;tot+=out[c].total;});
-  return {cats:out,total:Math.round(tot*100)/100};
+  let tot=0,fac=0;
+  Object.keys(out).forEach(c=>{
+    out[c].total=Math.round((out[c].efectivo+out[c].tc)*100)/100;
+    out[c].conFactura=Math.round(out[c].conFactura*100)/100;
+    tot+=out[c].total; fac+=out[c].conFactura;
+  });
+  return {cats:out,total:Math.round(tot*100)/100,conFactura:Math.round(fac*100)/100};
 }
 
 function renderDeducibles(){
@@ -2053,24 +2094,29 @@ function renderDeducibles(){
   const ICO={'Vivienda':'🏠','Alimentación':'🍽️','Salud':'💊','Educación y cultura':'📚','Vestimenta':'👕','Turismo':'✈️'};
   const filas=CAT_DEDUCIBLES.map(c=>({cat:c,...d.cats[c]})).sort((a,b)=>b.total-a.total);
   const max=Math.max(1,...filas.map(f=>f.total));
-  const rebaja=d.total*0.18;
+  const rebaja=d.conFactura*0.18;
+  const sinFac=Math.round((d.total-d.conFactura)*100)/100;
   el.innerHTML=`<div class="card" style="--ca:#4fd1c5;">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
       <div class="cl" style="margin:0;">🧾 Gasto deducible ${yr} — SRI</div>
-      <div style="font-family:'DM Mono',monospace;font-size:17px;color:var(--ac);font-weight:700;">${fm(d.total)}</div>
+      <div style="text-align:right;">
+        <div style="font-family:'DM Mono',monospace;font-size:17px;color:var(--ac);font-weight:700;">${fm(d.conFactura)}</div>
+        <div style="font-size:9.5px;color:var(--tx3);">con factura</div>
+      </div>
     </div>
-    <div style="font-size:10.5px;color:var(--tx3);margin-bottom:12px;">Efectivo + tarjeta. Solo cuenta para el SRI lo que tenga factura electrónica a tu nombre.</div>
+    <div style="font-size:10.5px;color:var(--tx3);margin-bottom:12px;">Gastaste ${fm(d.total)} en categorías deducibles${sinFac>0.004?`, pero ${fm(sinFac)} sin factura no cuentan para el SRI`:''}.</div>
     ${filas.map(f=>`<div style="margin-bottom:7px;">
       <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:2px;">
         <span>${ICO[f.cat]||''} ${esc(f.cat)}</span>
-        <span class="mono" style="color:var(--tx2);">${fm(f.total)}${f.tc>0?` <span style="font-size:9.5px;color:var(--tx3);">(TC ${fm(f.tc)})</span>`:''}</span>
+        <span class="mono" style="color:var(--tx2);">${fm(f.conFactura)}${(f.total-f.conFactura)>0.004?` <span style="font-size:9.5px;color:var(--warn);">de ${fm(f.total)}</span>`:''}</span>
       </div>
-      <div style="height:5px;background:var(--sf2);border-radius:3px;overflow:hidden;">
-        <div style="height:100%;width:${(f.total/max*100).toFixed(1)}%;background:var(--ac);border-radius:3px;"></div>
+      <div style="height:5px;background:var(--sf2);border-radius:3px;overflow:hidden;position:relative;">
+        <div style="height:100%;width:${(f.total/max*100).toFixed(1)}%;background:rgba(246,173,85,.45);border-radius:3px;position:absolute;left:0;top:0;"></div>
+        <div style="height:100%;width:${(f.conFactura/max*100).toFixed(1)}%;background:var(--ac);border-radius:3px;position:absolute;left:0;top:0;"></div>
       </div>
     </div>`).join('')}
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);font-size:11px;color:var(--tx3);">
-      Rebaja estimada al 18%: <strong style="color:var(--ok);font-family:'DM Mono',monospace;">${fm(rebaja)}</strong>
+      Rebaja estimada al 18% de lo facturado: <strong style="color:var(--ok);font-family:'DM Mono',monospace;">${fm(rebaja)}</strong>
       · el SRI aplica el menor entre ese 18% y el tope por canasta básica según tus cargas familiares.
     </div>
   </div>`;
@@ -4386,7 +4432,14 @@ function renderAlertaTemprana(){
 
 
 
-function onCatChange(){}
+// Muestra la casilla de factura solo cuando la categoría elegida es deducible.
+function onCatChange(){
+  const grp=document.getElementById('rFacturaGrp');
+  if(!grp)return;
+  const sel=document.getElementById('rCatEgr');
+  const esDed = tipo==='egreso' && sel && CAT_DEDUCIBLES.includes(sel.value);
+  grp.style.display = esDed ? 'flex' : 'none';
+}
 
 function updateTCTracker(){
   const now=new Date();

@@ -239,6 +239,10 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
    `syncIngresosGanaderia` leen, modifican y reescriben el JSON completo sin
    `LockService`; si coinciden con un guardado de Finanzas, uno pisa al otro.
    Claude no puede editar el Apps Script: el usuario debe pegar el parche.
+   **GAS v4 listo** (2026-11-08) en OneDrive `_versiones\finanzas\Finanzas_GAS_v4_completo.txt`:
+   bloqueo en leer/guardar/sync* y escritura sin dejar la columna vacía. Probado
+   con simulaciones. Falta que el usuario lo pegue y lo implemente **editando la
+   implementación existente** (nueva versión), para no cambiar la URL.
 3. El reporte del coach sigue generando el gráfico como imagen; si falla su
    subida a Drive, la causa y el arreglo son los mismos que aquí.
 4. Categoría *Cuidado personal* (peluquería, aseo, gimnasio): propuesta y

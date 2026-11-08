@@ -4,7 +4,7 @@ App de control de ingresos, egresos e inversiones, orientada a comprar una finca
 ganadera de ~$100.000 en Santo Domingo de los Tsáchilas. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última versión: **v40** · 2026-11-08 (commit local, pendiente de publicar)
+Última versión: **v40** · 2026-11-08
 
 ---
 
@@ -221,7 +221,7 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 
 ## Estado al 2026-11-08
 
-- v39 publicada; v40 lista en local, pendiente de push.
+- v40 publicada el 2026-11-08 (respaldo `finanzas_2026-11-08_v40.html`).
 - Estados de cuenta cargados: dic-2025 a oct-2026.
 - Gasto deducible 2026: **$3.849,14 facturado** de $5.562,21 gastado (cifra que
   v40 restituye; en la hoja hoy figura $5.553,96 hasta que se abra v40).

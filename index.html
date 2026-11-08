@@ -784,8 +784,8 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v39';
-const APP_FECHA='2026-11-01';
+const APP_VERSION='v40';
+const APP_FECHA='2026-11-08';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -849,7 +849,10 @@ function setSyncStatus(estado, msg){
 }
 
 // ── Guardar en Drive (primario) + localStorage (respaldo) ──
+function verNum(v){const n=parseInt(String(v||'').replace(/\D/g,''),10);return isNaN(n)?0:n;}
+let _ultLectura=0;
 async function save(){
+  db._appVer=APP_VERSION; // quién escribió por última vez (ver load)
   guardarLocal();
   _saveSeq++; // el estado local cambió: invalida cualquier lectura ya en camino
   if(!SCRIPT_URL) return; // Sin conexión configurada todavía
@@ -901,6 +904,19 @@ async function load(opts){
       return;
     }
     if(j.ok&&j.data){
+      // Una pestaña abierta con código viejo no debe seguir trabajando sobre datos que
+      // ya escribió una versión más nueva: los pisaría al guardar. Se recarga una vez.
+      if(verNum(j.data._appVer)>verNum(APP_VERSION)){
+        const k='fin_recarga_'+j.data._appVer;
+        let ya=false; try{ya=sessionStorage.getItem(k)==='1';sessionStorage.setItem(k,'1');}catch(e){}
+        if(!ya){location.reload();return;}
+        if(typeof toast==='function')toast('🔄 Hay una versión nueva ('+j.data._appVer+'): cierra la app y ábrela de nuevo');
+      }
+      // Las banderas de migración (_mig*) viajan con los datos. Si la hoja no trae una
+      // que este dispositivo sí tiene, es porque alguien escribió encima datos sin esa
+      // migración: hay que soltar la bandera local para que vuelva a correr. Con
+      // Object.assign sola quedaba pegada (así se perdieron las marcas de v39).
+      Object.keys(db).forEach(k=>{if(k.charAt(0)==='_'&&!(k in j.data))delete db[k];});
       Object.assign(db,j.data);
       guardarLocal();
       // IMPORTANTE: las migraciones deben correr ANTES de recalcTodo(). Si no, el historial
@@ -916,8 +932,10 @@ async function load(opts){
       migrarCategoriasV36();
       migrarFechasTCV38();
       migrarFacturaV39();
+      migrarFacturaV40();
       if(vincularLotesGanaderia())save();
       recalcTodo();
+      _ultLectura=Date.now();
       setSyncStatus('synced','✓ Sincronizado con Drive · '+new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}));
       return;
     } else throw new Error(j.error||'Sin datos');
@@ -935,6 +953,7 @@ async function load(opts){
   migrarCategoriasV36();
   migrarFechasTCV38();
   migrarFacturaV39();
+  migrarFacturaV40();
   vincularLotesGanaderia();
   recalcTodo(); // faltaba: sin esto el Dashboard mostraba el hist viejo de localStorage
 }
@@ -991,6 +1010,7 @@ function importarRespaldo(input){
     migrarCategoriasV36();
     migrarFechasTCV38();
     migrarFacturaV39();
+    migrarFacturaV40();
     vincularLotesGanaderia();
     recalcTodo();
     save();
@@ -1160,6 +1180,28 @@ function migrarFacturaV39(){
   });
   db._migFacturaV39=true;
   if(n)console.log('[Migración v39] '+n+' egresos en efectivo marcados sin factura');
+  save();
+}
+
+// Reparación de v39. Las marcas «sin factura» del histórico se perdieron en la hoja
+// (una escritura con datos anteriores a v39 las borró) mientras la bandera
+// _migFacturaV39 quedó puesta, así que v39 no volvía a correr. Se reaplica el mismo
+// criterio, pero SOLO a lo registrado antes de publicar v39 (4-nov-2026 15:15): lo
+// posterior ya lo decidió la casilla del formulario y no se toca.
+const V39_PUBLICADA=Date.UTC(2026,10,4,20,15,41);
+function migrarFacturaV40(){
+  if(db._migFacturaV40)return;
+  let n=0;
+  (db.movimientos||[]).forEach(m=>{
+    if(m.tipo!=='egreso'||esFlujoInv(m))return;
+    if(!CAT_DEDUCIBLES.includes(m.categoria))return;
+    if(m.sinFactura!==undefined)return;
+    const t=Number(m.id);
+    const previo=(isFinite(t)&&t>1e12)?t<V39_PUBLICADA:String(m.fecha||'')<'2026-11-04';
+    if(previo){m.sinFactura=true;n++;}
+  });
+  db._migFacturaV40=true;
+  if(n)console.log('[Migración v40] '+n+' egresos en efectivo anteriores a v39 vuelven a quedar sin factura');
   save();
 }
 
@@ -5267,6 +5309,15 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     renderInv();updateInvKpis();
     setTimeout(()=>{renderPie(0,0,0,0,0,0,0,0);},100);
   }
+
+  // Al volver a la app (el teléfono la deja abierta días), leer antes de que el usuario
+  // registre algo: así una versión nueva recarga la página y no se guarda sobre datos viejos.
+  document.addEventListener('visibilitychange',async()=>{
+    if(document.visibilityState!=='visible'||!SCRIPT_URL||_savePend>0)return;
+    if(Date.now()-_ultLectura<60000)return;
+    await load({auto:true});
+    recalcTodo();refreshDash();renderReg();renderInv();updateInvKpis();
+  });
 
   // Auto-sincronizar cada 5 minutos
   setInterval(async()=>{

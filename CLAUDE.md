@@ -4,7 +4,7 @@ App de control de ingresos, egresos e inversiones, orientada a comprar una finca
 ganadera de ~$100.000 en Santo Domingo de los Tsáchilas. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última versión: **v39** · 2026-11-08
+Última versión: **v40** · 2026-11-08 (commit local, pendiente de publicar)
 
 ---
 
@@ -137,7 +137,8 @@ La casilla del formulario aparece solo en categorías deducibles y viene marcada
 por defecto. Se guarda solo la excepción (`sinFactura: true`).
 
 Criterio aplicado al histórico (migración v39): **tarjeta = con factura,
-efectivo = sin factura**.
+efectivo = sin factura**. v40 lo reaplicó tras perderse en la hoja, solo a lo
+registrado antes de publicar v39 (4-nov-2026 15:15); lo posterior lo decide la casilla.
 
 `TC_CAT_MAP` reconoce los comercios reales del usuario y clasifica los consumos
 al importar el PDF. Ampliarlo cuando aparezcan comercios nuevos en "Otros".
@@ -159,6 +160,7 @@ al importar el PDF. Ampliarlo cuando aparezcan comercios nuevos en "Otros".
 | Valores que "cambian solos" | Migraciones corriendo después de `recalcTodo()` | Migraciones **antes** de `recalcTodo()` |
 | Desfases de fecha | UTC: `new Date('YYYY-MM-DD')` cae el día anterior en Ecuador (UTC-5) | `parseLocalDate()` y `today()` locales, siempre |
 | Un dispositivo en v28 y otro en v29 | GitHub Pages sirve con `max-age=600` | v30: `cache:'no-store'` y `updateViaCache:'none'` |
+| Marcas «sin factura» de v39 perdidas (facturado $5.553 en vez de $3.849) con la bandera `_migFacturaV39` puesta | Una escritura con datos anteriores a v39 (pestaña vieja abierta o sync de Ganadería sin bloqueo) pisó la hoja; al leer, `Object.assign` conservó la bandera **local** y la migración no volvió a correr | v40: `load()` suelta las claves `_*` que la hoja no trae; `migrarFacturaV40()` repara; `db._appVer` + recarga si la hoja la escribió una versión más nueva; lectura al volver a la app |
 
 **Hueco conocido, aún abierto**: si el guardado falla por falta de señal, no hay
 reintento ni marca persistente; la siguiente lectura buena se lleva el cambio. El
@@ -168,7 +170,7 @@ usuario lo conoce y decidió no abordarlo todavía.
 
 ## Reporte mensual (tarea programada)
 
-Corre el **día 5 de cada mes a las 7:35** (America/Guayaquil) y reporta el mes
+Corre el **día 3 de cada mes a las 19:34** (America/Guayaquil) y reporta el mes
 anterior. Trigger `trig_01J9NUMxxUSxyK47txEdH4Qc`. Corre en la nube, sin depender
 de la computadora del usuario.
 
@@ -188,9 +190,10 @@ Vectorial pesa 8 KB.
 
 `historico_patrimonio.json` guarda el patrimonio mes a mes. Es necesario porque
 los instrumentos cerrados se borran del JSON y el pasado no es reconstruible.
-**Pendiente de ordenar**: la corrida del 5-nov lo versionó en el repo, mientras
-que el prompt del trigger apunta al archivo de Drive
-(`1cArrD5GSh_GfNXnBoFCrlXm6JqY-ko5f`). Conviene dejar una sola fuente.
+**Fuente única: el repo** (`reportes/historico_patrimonio.json`); el trigger lo
+sube con el conector de GitHub. El archivo de Drive
+(`1cArrD5GSh_GfNXnBoFCrlXm6JqY-ko5f`) es una copia congelada de oct-2026 y no se
+actualiza: el conector de Drive no reescribe contenido.
 
 ---
 
@@ -199,6 +202,11 @@ que el prompt del trigger apunta al archivo de Drive
 Hay un patrón que funciona bien y conviene reutilizar: servir el repo en local,
 abrirlo con Playwright interceptando las peticiones al Apps Script y devolviendo
 un `db` controlado (o el real, descargado del Sheet).
+
+Sin Playwright (no está instalado en Windows) sirve igual un servidor Python que
+entregue el repo y simule `/gas` (`leer`/`guardar` sobre un JSON en disco), con
+`finanzas_gas_url` apuntando a él en `localStorage`, y el navegador integrado.
+Así se probó v40.
 
 ```bash
 cd <repo> && python3 -m http.server 8099 --bind 127.0.0.1 &
@@ -213,10 +221,10 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 
 ## Estado al 2026-11-08
 
-- v39 publicada y funcionando.
+- v39 publicada; v40 lista en local, pendiente de push.
 - Estados de cuenta cargados: dic-2025 a oct-2026.
-- Gasto deducible 2026: **$3.849,14 facturado** de $5.550,71 gastado. Rebaja
-  estimada $692,85.
+- Gasto deducible 2026: **$3.849,14 facturado** de $5.562,21 gastado (cifra que
+  v40 restituye; en la hoja hoy figura $5.553,96 hasta que se abra v40).
 - Patrimonio: ~$19.269 (ganado $10.000, PF $1.000, metas $8.269). 19,3% de la
   meta de $100.000; al ritmo actual, agosto de 2030.
 - Diferidos activos: PMZ Mirgor (hasta may-2027), Sony y Nike (dic-2026).
@@ -227,11 +235,12 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 1. **Vivienda quedó con $0 facturado** ($541,10 en efectivo). Si ahí hay planillas
    de luz, agua o internet, sí tienen factura electrónica y el usuario debería
    marcarlas; si son pagos familiares, está bien así.
-2. Unificar dónde vive `historico_patrimonio.json` (repo o Drive).
-3. Posible duplicado en la carpeta de Drive: el reporte de octubre está subido
-   dos veces, una por Claude el 1-nov y otra por la tarea el 5-nov.
-4. El reporte del coach sigue generando el gráfico como imagen; si falla su
+2. **Apps Script sin bloqueo**: `syncGanaderia`, `syncEgresosGanaderia` y
+   `syncIngresosGanaderia` leen, modifican y reescriben el JSON completo sin
+   `LockService`; si coinciden con un guardado de Finanzas, uno pisa al otro.
+   Claude no puede editar el Apps Script: el usuario debe pegar el parche.
+3. El reporte del coach sigue generando el gráfico como imagen; si falla su
    subida a Drive, la causa y el arreglo son los mismos que aquí.
-5. Categoría *Cuidado personal* (peluquería, aseo, gimnasio): propuesta y
+4. Categoría *Cuidado personal* (peluquería, aseo, gimnasio): propuesta y
    descartada por ahora, el usuario dejó esos gastos en "Otros". Retomar si
    "Otros" vuelve a crecer.

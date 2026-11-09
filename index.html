@@ -490,10 +490,10 @@ details[open] summary::before{transform:rotate(90deg);}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;">Dashboard — <span id="dashLabel" style="color:var(--ac)">Mayo 2026</span></div>
     <div style="display:flex;gap:6px;">
-      <select id="dYear" onchange="refreshDash()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:5px 10px;color:var(--tx);font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
+      <select id="dYear" onchange="refreshDash();renderReg()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:5px 10px;color:var(--tx);font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
         <option>2024</option><option>2025</option><option selected>2026</option>
       </select>
-      <select id="dMonth" onchange="refreshDash()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:5px 10px;color:var(--tx);font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
+      <select id="dMonth" onchange="refreshDash();renderReg()" style="background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:5px 10px;color:var(--tx);font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
         <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
         <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
         <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
@@ -784,8 +784,8 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v40';
-const APP_FECHA='2026-11-08';
+const APP_VERSION='v41';
+const APP_FECHA='2026-11-09';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1449,6 +1449,7 @@ function setTipo(t){
   document.getElementById('btnI').className='btn '+(t==='ingreso'?'btn-p':'btn-g');
   document.getElementById('catEgrGrp').style.display=t==='egreso'?'':'none';
   document.getElementById('catIngGrp').style.display=t==='ingreso'?'':'none';
+  onCatChange(); // la casilla de factura depende del tipo y de la categoría ya elegida
 }
 
 // ════════════════════════════════════════
@@ -1612,7 +1613,11 @@ function cancelarEdicion(){
 //  RENDER REGISTRO
 // ════════════════════════════════════════
 function renderReg(){
-  const now=new Date();
+  // Mismo mes que el selector del Dashboard: el resumen y la tabla de abajo deben
+  // hablar del mismo mes (antes el resumen quedaba fijo en el mes en curso).
+  const _hoy=new Date();
+  const _ry=parseInt(document.getElementById('dYear')?.value), _rm=parseInt(document.getElementById('dMonth')?.value);
+  const now=new Date(isNaN(_ry)?_hoy.getFullYear():_ry, isNaN(_rm)?_hoy.getMonth():_rm, 1);
   document.getElementById('reg-mes-lbl').textContent=MN[now.getMonth()]+' '+now.getFullYear();
   const h=db.hist.find(x=>x.a===now.getFullYear()&&x.m===MN[now.getMonth()])||{ing:0,ev:0,imp:0,deu:0,aho:0};
   const ing=h.ing||0,ev=h.ev||0,imp=h.imp||0,deu=h.deu||0,aho=h.aho||0;
@@ -5288,6 +5293,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   const _av=document.getElementById('app-ver'); if(_av){_av.textContent=APP_VERSION;_av.title='FINANZAS_LM '+APP_VERSION+' · '+APP_FECHA;}
   renderConexionEstado();
   document.getElementById('rFecha').value=today();
+  onCatChange(); // Alimentación viene elegida: mostrar ya la casilla de factura
   document.getElementById('mainModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
   iniciarFrases();
 

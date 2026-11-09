@@ -4,7 +4,7 @@ App de control de ingresos, egresos e inversiones, orientada a comprar una finca
 ganadera de ~$100.000 en Santo Domingo de los Tsáchilas. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última versión: **v40** · 2026-11-08
+Última versión: **v41** · 2026-11-09
 
 ---
 
@@ -160,6 +160,8 @@ al importar el PDF. Ampliarlo cuando aparezcan comercios nuevos en "Otros".
 | Valores que "cambian solos" | Migraciones corriendo después de `recalcTodo()` | Migraciones **antes** de `recalcTodo()` |
 | Desfases de fecha | UTC: `new Date('YYYY-MM-DD')` cae el día anterior en Ecuador (UTC-5) | `parseLocalDate()` y `today()` locales, siempre |
 | Un dispositivo en v28 y otro en v29 | GitHub Pages sirve con `max-age=600` | v30: `cache:'no-store'` y `updateViaCache:'none'` |
+| Casilla «con factura» oculta al abrir el formulario con Alimentación ya elegida | Solo se evaluaba al cambiar la categoría | v41: `onCatChange()` al arrancar y en `setTipo()` |
+| Elegir otro mes en el Dashboard no cambiaba la tabla de movimientos hasta cambiar de pestaña | El selector llamaba solo a `refreshDash()`; la tabla la pinta `renderReg()` | v41: el selector llama a ambas, y el resumen sobre la tabla sigue el mismo mes |
 | Marcas «sin factura» de v39 perdidas (facturado $5.553 en vez de $3.849) con la bandera `_migFacturaV39` puesta | Una escritura con datos anteriores a v39 (pestaña vieja abierta o sync de Ganadería sin bloqueo) pisó la hoja; al leer, `Object.assign` conservó la bandera **local** y la migración no volvió a correr | v40: `load()` suelta las claves `_*` que la hoja no trae; `migrarFacturaV40()` repara; `db._appVer` + recarga si la hoja la escribió una versión más nueva; lectura al volver a la app |
 
 **Hueco conocido, aún abierto**: si el guardado falla por falta de señal, no hay
@@ -222,6 +224,8 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 ## Estado al 2026-11-08
 
 - v40 publicada el 2026-11-08 (respaldo `finanzas_2026-11-08_v40.html`).
+- GAS v4 (con bloqueo) implementado por el usuario el 2026-11-09.
+- v41 lista: casilla de factura visible al abrir y selector de mes que refresca la tabla.
 - Estados de cuenta cargados: dic-2025 a oct-2026.
 - Gasto deducible 2026: **$3.849,14 facturado** de $5.562,21 gastado (cifra que
   v40 restituye; en la hoja hoy figura $5.553,96 hasta que se abra v40).
@@ -235,16 +239,8 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 1. **Vivienda quedó con $0 facturado** ($541,10 en efectivo). Si ahí hay planillas
    de luz, agua o internet, sí tienen factura electrónica y el usuario debería
    marcarlas; si son pagos familiares, está bien así.
-2. **Apps Script sin bloqueo**: `syncGanaderia`, `syncEgresosGanaderia` y
-   `syncIngresosGanaderia` leen, modifican y reescriben el JSON completo sin
-   `LockService`; si coinciden con un guardado de Finanzas, uno pisa al otro.
-   Claude no puede editar el Apps Script: el usuario debe pegar el parche.
-   **GAS v4 listo** (2026-11-08) en OneDrive `_versiones\finanzas\Finanzas_GAS_v4_completo.txt`:
-   bloqueo en leer/guardar/sync* y escritura sin dejar la columna vacía. Probado
-   con simulaciones. Falta que el usuario lo pegue y lo implemente **editando la
-   implementación existente** (nueva versión), para no cambiar la URL.
-3. El reporte del coach sigue generando el gráfico como imagen; si falla su
+2. El reporte del coach sigue generando el gráfico como imagen; si falla su
    subida a Drive, la causa y el arreglo son los mismos que aquí.
-4. Categoría *Cuidado personal* (peluquería, aseo, gimnasio): propuesta y
+3. Categoría *Cuidado personal* (peluquería, aseo, gimnasio): propuesta y
    descartada por ahora, el usuario dejó esos gastos en "Otros". Retomar si
    "Otros" vuelve a crecer.

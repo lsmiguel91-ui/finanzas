@@ -225,7 +225,7 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 
 - v40 publicada el 2026-11-08 (respaldo `finanzas_2026-11-08_v40.html`).
 - GAS v4 (con bloqueo) implementado por el usuario el 2026-11-09.
-- v41 lista: casilla de factura visible al abrir y selector de mes que refresca la tabla.
+- v41 publicada el 2026-11-09 (respaldo `finanzas_2026-11-09_v41.html`): casilla de factura visible al abrir y selector de mes que refresca la tabla.
 - Estados de cuenta cargados: dic-2025 a oct-2026.
 - Gasto deducible 2026: **$3.849,14 facturado** de $5.562,21 gastado (cifra que
   v40 restituye; en la hoja hoy figura $5.553,96 hasta que se abra v40).

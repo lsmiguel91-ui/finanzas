@@ -6,7 +6,8 @@ sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 Última versión: **v43** · 2026-11-15
 
 > **El repositorio es público.** Aquí no van cifras, ids de archivos ni datos del
-> usuario: todo eso está en `CLAUDE.local.md` (ignorado por git). Tampoco se suben
+> usuario: todo eso está en el archivo privado de Google Drive `finanzas_privado_AAAA-MM-DD.md`
+> (en la PC, también en `CLAUDE.local.md`, ignorado por git). Tampoco se suben
 > datos al repo: los datos viven solo en la hoja y en Google Drive.
 
 ---

@@ -22,6 +22,11 @@ sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 | Respaldo de cada versión | Tag `vN` en este repo (desde 18-nov-2026) |
 | Generador del reporte | `reportes/` en este repo (solo código, sin datos) |
 
+**Orden en Drive (desde 18-nov-2026):** todo lo de este proyecto (hoja, archivo privado, copia del GAS,
+carpeta de reportes mensuales) está en la carpeta `Finanzas` de Drive. Todo archivo nuevo, incluido cada
+`finanzas_privado_AAAA-MM-DD.md`, se crea **dentro de esa carpeta** (`parentId`), nunca suelto en la raíz.
+Mover no cambia los ids.
+
 La URL del Apps Script **no está en el código**: el repo es público y ese endpoint
 no tiene autenticación. La app la pide una vez por dispositivo y la guarda en
 `localStorage`.

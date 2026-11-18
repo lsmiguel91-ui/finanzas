@@ -3,7 +3,7 @@
 App de control de ingresos, egresos e inversiones. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última versión: **v44** · 2026-11-18
+Última publicación: **App actualizada 18-nov-2026** (interno v45)
 
 > **El repositorio es público.** Aquí no van cifras, ids de archivos ni datos del
 > usuario: todo eso está en el archivo privado de Google Drive `finanzas_privado_AAAA-MM-DD.md`
@@ -19,7 +19,7 @@ sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 | Código vivo | Este repo, `index.html` (un solo archivo) · **es la única copia editable** |
 | App publicada | https://lsmiguel91-ui.github.io/finanzas/ (GitHub Pages, desde `main`) |
 | Base de datos, backend, reportes, histórico, estado y pendientes | Archivo privado en Google Drive: buscar por título `finanzas_privado` y usar el de fecha más reciente (`finanzas_privado_AAAA-MM-DD.md`). En la PC existe además `CLAUDE.local.md` (fuera del repo), que puede estar atrasado |
-| Respaldo de cada versión | Tag `vN` en este repo (desde 18-nov-2026) |
+| Respaldo de cada versión | El historial de git de `main`. **No se crean tags** |
 | Generador del reporte | `reportes/` en este repo (solo código, sin datos) |
 
 **Orden en Drive (desde 18-nov-2026):** todo lo de este proyecto (hoja, archivo privado, copia del GAS,
@@ -35,13 +35,18 @@ no tiene autenticación. La app la pide una vez por dispositivo y la guarda en
 
 ## Reglas de trabajo (no negociables)
 
-1. **El repositorio es la única copia viva.** Cada publicación lleva su tag `vN`
-   (`git push origin vN`); los respaldos fechados de OneDrive anteriores al
-   18-nov-2026 quedan como archivo histórico. Nunca editar un HTML suelto: dos
-   copias editables se separan y el error aparece tarde.
-2. **`APP_VERSION` (index.html) y `VERSION` (sw.js) suben en el mismo commit.**
-   Si no, el dispositivo se queda en la versión vieja y el usuario trabaja con
-   código antiguo creyendo que está actualizado.
+1. **El repositorio es la única copia viva y su historial de git es el respaldo.**
+   No crear tags ni pedirle al usuario nada en git (regla del usuario, 18-nov-2026).
+   Los respaldos fechados de OneDrive anteriores al 18-nov-2026 quedan como archivo
+   histórico. Nunca editar un HTML suelto: dos copias editables se separan y el
+   error aparece tarde.
+2. **En cada publicación suben juntos, en el mismo commit: `APP_VERSION`
+   (index.html), `VERSION` (sw.js) y `APP_FECHA` (index.html, fecha del día).**
+   El número es solo interno (caché y control entre equipos); el usuario ve
+   «App actualizada DD-mmm-AAAA», que sale de `APP_FECHA`. Si no suben juntos, el
+   dispositivo se queda en la versión vieja creyendo que está actualizado.
+   **Al publicar, decirle al usuario solo: «verifica que diga App actualizada
+   <fecha de hoy>»**.
 3. **Verificar antes de entregar.** `node --check` sobre el bloque `<script>`, y
    para cualquier cambio de lógica, una prueba real en navegador (ver *Cómo
    probar*). Reproducir el fallo antes de arreglarlo.
@@ -272,7 +277,7 @@ app Claude del celular), para poder trabajar con la PC apagada.
   datos.
 - **Una sola sesión a la vez.** No trabajar Finanzas en la PC y en la nube al mismo
   tiempo.
-- **Al terminar:** todo cambio verificado queda subido a `main` con su tag; nunca
+- **Al terminar:** todo cambio verificado queda subido a `main` (sin tags); nunca
   dejar trabajo solo en la VM, porque se borra.
 - **Pruebas:** Playwright/Chromium en la VM (instalar con pip o npm si falta), con
   el patrón de *Cómo probar*.

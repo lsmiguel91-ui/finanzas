@@ -197,7 +197,7 @@ details[open] summary::before{transform:rotate(90deg);}
 </div>
 <div class="topbar">
 <header>
-  <div class="logo">FINANZAS <span>· Luis Miguel</span><span id="app-ver" style="font-size:10px;color:var(--tx3);margin-left:8px;font-family:'DM Mono',monospace;"></span></div>
+  <div class="logo">FINANZAS <span id="app-ver" style="font-size:10px;color:var(--tx3);margin-left:8px;font-family:'DM Mono',monospace;"></span></div>
   <div class="hdate" id="hdate"></div>
 </header>
 
@@ -784,8 +784,8 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v44';
-const APP_FECHA='2026-11-15';
+const APP_VERSION='v45'; // interno: caché y control de versión entre equipos; no se muestra
+const APP_FECHA='2026-11-18'; // fecha de publicación: es lo que ve el usuario («App actualizada …»)
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1087,7 +1087,7 @@ async function load(opts){
         const k='fin_recarga_'+j.data._appVer;
         let ya=false; try{ya=sessionStorage.getItem(k)==='1';sessionStorage.setItem(k,'1');}catch(e){}
         if(!ya){location.reload();return;}
-        if(typeof toast==='function')toast('🔄 Hay una versión nueva ('+j.data._appVer+'): cierra la app y ábrela de nuevo');
+        if(typeof toast==='function')toast('🔄 Hay una actualización de la app: ciérrala y ábrela de nuevo');
       }
       // Reemplaza lo local por la hoja; si había cambios sin subir, los combina.
       // (Antes Object.assign dejaba pegadas claves locales que la hoja no traía.)
@@ -5508,7 +5508,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     dMonth.value=String(mi);
   }
   document.getElementById('hdate').textContent=now.toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
-  const _av=document.getElementById('app-ver'); if(_av){_av.textContent=APP_VERSION;_av.title='FINANZAS_LM '+APP_VERSION+' · '+APP_FECHA;}
+  const _av=document.getElementById('app-ver'); if(_av){const [fa,fm_,fd]=APP_FECHA.split('-');const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];_av.textContent='App actualizada '+fd+'-'+MES[+fm_-1]+'-'+fa;_av.title='FINANZAS_LM '+APP_VERSION;}
   renderConexionEstado();
   document.getElementById('rFecha').value=today();
   onCatChange(); // Alimentación viene elegida: mostrar ya la casilla de factura

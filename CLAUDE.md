@@ -3,7 +3,7 @@
 App de control de ingresos, egresos e inversiones. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última versión: **v43** · 2026-11-15
+Última versión: **v44** · 2026-11-18
 
 > **El repositorio es público.** Aquí no van cifras, ids de archivos ni datos del
 > usuario: todo eso está en el archivo privado de Google Drive `finanzas_privado_AAAA-MM-DD.md`
@@ -172,6 +172,7 @@ al importar el PDF. Ampliarlo cuando aparezcan comercios nuevos en "Otros".
 | Retornos de inversión contados como ingreso ordinario | Anotados a mano como «Retorno Inversión» sin `flujoInv` | v42–v43: `migrarSalidaAgo26()` y `migrarRetornosFlujoV43()`; al registrar un retorno a mano se marca solo. El cash no cambia |
 | Datos financieros reales en el repo público (F8) | Valores por defecto de `db`, comentarios con cifras, histórico de patrimonio y este archivo | v43: `db` por defecto vacío, ejemplos ficticios, histórico a Drive, lo privado a `CLAUDE.local.md` |
 | Marcas «sin factura» de v39 perdidas (todo contaba como facturado) con la bandera `_migFacturaV39` puesta | Una escritura con datos anteriores a v39 (pestaña vieja abierta o sync de Ganadería sin bloqueo) pisó la hoja; al leer, `Object.assign` conservó la bandera **local** y la migración no volvió a correr | v40: `load()` suelta las claves `_*` que la hoja no trae; `migrarFacturaV40()` repara; `db._appVer` + recarga si la hoja la escribió una versión más nueva; lectura al volver a la app |
+| Señal de venta del lote decía «No aceptes menos de» el precio normal del mercado, por debajo de lo pagado; y «VENDE» a un lote recién comprado | La señal viene de Ganadería y solo mira el mercado, no el costo del lote | v44: una tarjeta por lote; piso = mayor entre mercado y `senal.precioEquilibrio` (más `precioObjetivo` y `capitalRecuperado`), que debe enviar Ganadería; si el lote no llegó a su fecha de venta dice «En engorde» |
 
 ### Sincronización desde v42 (auditoría del 15-nov-2026, hallazgos F1–F9)
 

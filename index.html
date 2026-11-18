@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Finanzas · Ñaupari</title>
+<title>Finanzas</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
 :root{
@@ -784,7 +784,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v43';
+const APP_VERSION='v44';
 const APP_FECHA='2026-11-15';
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
@@ -3129,21 +3129,45 @@ function renderGanadoAsogan(){
   // Filtrar solo los que tienen señal calculada por bitácora
   const conSenal=activos.filter(i=>i.senal&&i.senal.sBanner);
   if(!conSenal.length){el.innerHTML='';return;}
-  // Agrupar por catNom para no repetir si hay varios lotes del mismo tipo
-  const vistas=new Map();
-  conSenal.forEach(inv=>{
-    const s=inv.senal;
-    if(!vistas.has(s.catNom)) vistas.set(s.catNom,{s,lotes:[inv.desc]});
-    else vistas.get(s.catNom).lotes.push(inv.desc);
-  });
+  // Una tarjeta por lote: el precio mínimo depende de lo que costó cada lote, no solo del mercado.
+  // precioMin = lo normal del mercado; precioEquilibrio = debajo pierdes capital;
+  // precioObjetivo = rinde como la referencia CPN (6,5 % anual) con tu 50 % de la utilidad.
+  // Los dos últimos los calcula Ganadería con el peso proyectado; si aún no llegan, se avisa.
   const colorMap={ok:'var(--ok)',warn:'var(--warn)',err:'var(--err)',tx2:'var(--tx2)'};
-  const items=[...vistas.values()].map(({s,lotes})=>{
-    const color=colorMap[s.sColorKey]||'var(--tx2)';
+  const hoy=today();
+  const lb=v=>'$'+Number(v).toFixed(3)+'/lb';
+  const items=conSenal.map(inv=>{
+    const s=inv.senal;
+    const fVenta=inv.ff||inv.fventaEst||'';
+    const enEngorde=!!fVenta&&fVenta>hoy;
+    const color=enEngorde?'var(--tx2)':(colorMap[s.sColorKey]||'var(--tx2)');
+    const icon=enEngorde?'🌱':s.sIcon;
+    const banner=enEngorde?`En engorde — venta estimada ${fVenta}`:s.sBanner;
+    // El «No aceptes menos de» de Ganadería es solo el precio de mercado: se reemplaza por el piso del lote
+    const textoMercado=String(s.sTexto||'').replace(/\s*No aceptes menos de \$[\d.,]+\/lb\.?/,'').trim();
+    const mkt=Number(s.precioMin)>0?Number(s.precioMin):null;
+    const eq=Number(s.precioEquilibrio)>0?Number(s.precioEquilibrio):null;
+    const obj=Number(s.precioObjetivo)>0?Number(s.precioObjetivo):null;
+    let pisoHtml='';
+    if(s.capitalRecuperado){
+      pisoHtml='<div style="font-size:11px;color:var(--ok);margin-bottom:4px;">✅ Capital recuperado: lo que venga es ganancia.</div>';
+    }else if(eq){
+      const piso=Math.max(eq,mkt||0);
+      const partes=[`equilibrio ${lb(eq)} (debajo pierdes capital)`];
+      if(obj)partes.push(`objetivo ${lb(obj)} (rinde como un PF)`);
+      if(mkt)partes.push(`mercado ${lb(mkt)}`);
+      pisoHtml=`<div style="font-size:11px;color:var(--tx);margin-bottom:2px;">No aceptes menos de <strong style="color:var(--warn);">${lb(piso)}</strong>${mkt&&eq>mkt?' — tu equilibrio está sobre el precio normal del mercado':''}.</div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:4px;">${partes.join(' · ')}</div>`;
+    }else{
+      pisoHtml=`<div style="font-size:10px;color:var(--warn);margin-bottom:4px;">⚠️ Falta el precio de equilibrio de este lote (lo calcula Ganadería con el peso; abre el lote allá y sincroniza).${mkt?` Mercado: ${lb(mkt)}, no es tu piso.`:''}</div>`;
+    }
     return `<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05);">
-      <div style="font-size:20px;line-height:1.2;">${s.sIcon}</div>
+      <div style="font-size:20px;line-height:1.2;">${icon}</div>
       <div style="flex:1;">
-        <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:3px;">${s.catNom} — ${s.sBanner}</div>
-        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">${s.sTexto}</div>
+        <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:1px;">${s.catNom} — ${banner}</div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:3px;">${inv.desc||''}</div>
+        ${pisoHtml}
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">${textoMercado}</div>
         <div style="font-size:10px;color:var(--tx3);">Mejor momento: <strong style="color:var(--ac);">${s.mejorMesAnio}</strong></div>
       </div>
     </div>`;

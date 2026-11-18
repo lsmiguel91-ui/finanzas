@@ -17,7 +17,8 @@ sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 |---|---|
 | Código vivo | Este repo, `index.html` (un solo archivo) · **es la única copia editable** |
 | App publicada | https://lsmiguel91-ui.github.io/finanzas/ (GitHub Pages, desde `main`) |
-| Base de datos, backend, reportes, histórico, respaldos | Ver `CLAUDE.local.md` |
+| Base de datos, backend, reportes, histórico, estado y pendientes | Archivo privado en Google Drive: buscar por título `finanzas_privado` y usar el de fecha más reciente (`finanzas_privado_AAAA-MM-DD.md`). En la PC existe además `CLAUDE.local.md` (fuera del repo), que puede estar atrasado |
+| Respaldo de cada versión | Tag `vN` en este repo (desde 18-nov-2026) |
 | Generador del reporte | `reportes/` en este repo (solo código, sin datos) |
 
 La URL del Apps Script **no está en el código**: el repo es público y ese endpoint
@@ -28,9 +29,10 @@ no tiene autenticación. La app la pide una vez por dispositivo y la guarda en
 
 ## Reglas de trabajo (no negociables)
 
-1. **El repositorio es la única copia viva.** OneDrive guarda solo respaldos
-   fechados. Nunca editar un HTML suelto: dos copias editables se separan y el
-   error aparece tarde.
+1. **El repositorio es la única copia viva.** Cada publicación lleva su tag `vN`
+   (`git push origin vN`); los respaldos fechados de OneDrive anteriores al
+   18-nov-2026 quedan como archivo histórico. Nunca editar un HTML suelto: dos
+   copias editables se separan y el error aparece tarde.
 2. **`APP_VERSION` (index.html) y `VERSION` (sw.js) suben en el mismo commit.**
    Si no, el dispositivo se queda en la versión vieja y el usuario trabaja con
    código antiguo creyendo que está actualizado.
@@ -193,7 +195,7 @@ hoja, con su revisión). Lo que difiere entre ambas son cambios aún no subidos.
 
 ## Reporte mensual (tarea programada)
 
-Corre el día 3 de cada mes en la nube (trigger y hora en `CLAUDE.local.md`) y
+Corre el día 3 de cada mes en la nube (trigger y hora en el archivo privado de Drive) y
 reporta el mes anterior, sin depender de la computadora del usuario.
 
 ```
@@ -212,7 +214,7 @@ Vectorial pesa 8 KB.
 
 El histórico de patrimonio (mes a mes) es necesario porque los instrumentos
 cerrados se borran del JSON y el pasado no es reconstruible. **Vive en Google
-Drive, nunca en el repo** (detalles en `CLAUDE.local.md`). `.gitignore` bloquea
+Drive, nunca en el repo** (detalles en el archivo privado de Drive). `.gitignore` bloquea
 `historico_patrimonio*.json`.
 
 ---
@@ -248,4 +250,26 @@ suma total de egresos y el cash de cada mes no cambien** si solo se reclasifica.
 
 ## Estado y pendientes
 
-En `CLAUDE.local.md` (privado).
+En el archivo privado de Google Drive (`finanzas_privado_AAAA-MM-DD.md`, el más
+reciente). Al cerrar una etapa, crear uno nuevo con la fecha del día y el contenido
+completo actualizado (el conector de Drive no reescribe archivos).
+
+---
+
+## Dónde se trabaja (desde 18-nov-2026: en la nube)
+
+Esta app se maneja desde una sesión de Claude Code en la nube (claude.ai/code o la
+app Claude del celular), para poder trabajar con la PC apagada.
+- **Al empezar:** `git pull` de `main` y leer el archivo privado de Drive. Si el
+  conector de Google Drive no está disponible, decirlo al inicio en vez de suponer
+  datos.
+- **Una sola sesión a la vez.** No trabajar Finanzas en la PC y en la nube al mismo
+  tiempo.
+- **Al terminar:** todo cambio verificado queda subido a `main` con su tag; nunca
+  dejar trabajo solo en la VM, porque se borra.
+- **Pruebas:** Playwright/Chromium en la VM (instalar con pip o npm si falta), con
+  el patrón de *Cómo probar*.
+- **Publicar solo con aprobación del usuario.** Hallazgos y propuestas en tabla
+  (problema, causa, solución, ¿aprueba?).
+- **Repo público:** ningún dato personal, id ni cifra en el repo; van al archivo
+  privado de Drive.

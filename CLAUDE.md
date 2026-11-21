@@ -3,7 +3,7 @@
 App de control de ingresos, egresos e inversiones. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última publicación: **App actualizada 18-nov-2026** (interno v45)
+Última publicación: **App actualizada 21-nov-2026** (interno v46)
 
 > **El repositorio es público.** Aquí no van cifras, ids de archivos ni datos del
 > usuario: todo eso está en el archivo privado de Google Drive `finanzas_privado_AAAA-MM-DD.md`
@@ -202,6 +202,26 @@ hoja, con su revisión). Lo que difiere entre ambas son cambios aún no subidos.
   reintenta (30 s, evento `online`, al volver a la app y al leer). Ya no hay hueco
   abierto por falta de señal.
 - Las migraciones están en una sola función, `correrMigraciones()`.
+
+
+## Panel (pestaña 🚀, desde v46)
+
+Gráficas vivas para el celular, sin cifras propias: todo sale de las funciones del
+Dashboard (`efectivoHoy`, `cashRealFinMes`, `calcProyeccion`, `ahorrosEsperadosMes`,
+`calcMetaConRetiros`). Funciones `pn*` y `renderPanel*`.
+
+- **Cash del mes día a día**: real hasta hoy (cierra exacto en `efectivoHoy`),
+  proyección a fin de mes (cierra exacto en `cashRealFinMes`, TC al último día) y al
+  mes siguiente con el neto promedio de los 3 últimos meses cerrados.
+- **Pasivo contra gasto**: rendimiento mensual del capital por fuente frente al gasto
+  de consumo (promedio de 3 meses cerrados: `ev+imp+deu` + TC; el ahorro no es gasto).
+- **Simulador**: monto, destino y mes; compara pasivo y patrimonio con y sin la decisión.
+- Supuestos de `pnProyectar`: ganado al rendimiento real de los lotes vendidos (tu
+  parte, vía `retornoGanado`), PF y metas a su `tasaA`, todo reinvertido; las metas se
+  renuevan con su aporte actual al terminar el plazo; un PF nuevo del simulador usa
+  la mejor tasa de PF registrada. Meta de la finca: `PN_META_FINCA`.
+- Paleta de series validada para el fondo oscuro: ganado `#c97d26`, PF `#1fa196`,
+  metas `#8a6be6`.
 
 ---
 

@@ -856,7 +856,7 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v46'; // interno: caché y control de versión entre equipos; no se muestra
+const APP_VERSION='v47'; // interno: caché y control de versión entre equipos; no se muestra
 const APP_FECHA='2026-11-21'; // fecha de publicación: es lo que ve el usuario («App actualizada …»)
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
@@ -1034,7 +1034,7 @@ let _migEnEnvio=0;
 function migrarTrasCombinar(){if(_migEnEnvio>=2)return;_migEnEnvio++;correrMigraciones();}
 function repintarTodo(){
   try{recalcTodo();refreshDash();renderReg();checkAlerts();updateTCTracker();renderInv();updateInvKpis();}catch(e){console.warn('[repintar]',e);}
-  try{if(document.getElementById('tab-panel')?.classList.contains('act'))renderPanel();}catch(e){console.warn('[panel]',e);}
+  if(typeof pnRefrescar==='function')pnRefrescar();
 }
 async function leerHoja(){
   const r=await fetch(SCRIPT_URL+'?action=leer&t='+Date.now(),{method:'GET',mode:'cors'});
@@ -1060,6 +1060,7 @@ function programarReintento(seg){
 async function save(){
   db._appVer=APP_VERSION; // quién escribió por última vez (ver load)
   guardarLocal();
+  if(typeof pnRefrescar==='function')pnRefrescar();
   _saveSeq++; // el estado local cambió: invalida cualquier lectura ya en camino
   if(!SCRIPT_URL) return; // Sin conexión configurada todavía
   if(!_lecturaOk){
@@ -2487,6 +2488,7 @@ function registrarAhorrosMes(){
 
 function refreshDash(){
   renderBackupEstado(); // depende de db: debe repintarse con cada refresco, no una sola vez al arrancar
+  if(typeof pnRefrescar==='function')pnRefrescar(); // todo lo que refresca el Dashboard refresca el Panel
   const yr=parseInt(document.getElementById('dYear').value);
   const mi=parseInt(document.getElementById('dMonth').value);
   const mn=MN[mi];
@@ -3250,6 +3252,14 @@ function pnEventos(){
 }
 
 // ════ Render ════
+// Cualquier cambio (registro, TC importada, inversión, sincronización) repinta el Panel
+// si está a la vista. Agrupado: varios cambios seguidos = un solo repintado.
+let _pnTimer=null;
+function pnRefrescar(){
+  const t=document.getElementById('tab-panel');
+  if(!t||!t.classList.contains('act'))return;
+  clearTimeout(_pnTimer);_pnTimer=setTimeout(()=>{try{renderPanel();}catch(e){console.warn('[panel]',e);}},150);
+}
 function renderPanel(){
   if(!document.getElementById('tab-panel'))return;
   const now=new Date(), yr=now.getFullYear(), mi=now.getMonth();
@@ -3258,7 +3268,7 @@ function renderPanel(){
   const F=pnFijos(), base=pnProyectar(600), r0=base[0];
   const cob=F.mediana>0?r0.pas/F.mediana*100:0;
   const kp=[
-    {l:'💵 Efectivo hoy',v:ef==null?'—':pnFs(ef),s:'fin de mes: '+(fin==null?'—':pnFs(fin))},
+    {l:'💵 Efectivo hoy',v:ef==null?'—':pnFs(ef),s:'fin de mes, ya pagada la tarjeta: '+(fin==null?'—':pnFs(fin))},
     {l:'🧾 Egresos del mes',v:fm(egrHoy),s:'proyectado: '+fm(p.egrProyectado)},
     {l:'🌱 Ingreso pasivo',v:fm(r0.pas/PN_DIAS_MES)+'/día',s:fm(r0.pas)+' al mes'},
     {l:'🏠 Gastos fijos',v:fm(F.mediana)+'/mes',s:'el pasivo cubre el '+cob.toFixed(0)+' %'},
@@ -3306,27 +3316,45 @@ function renderPanelCash(yr,mi,ef,fin,p){
   const ahoP=totalAhorrosPendientes(yr,mi);
   if(ahoP>0){neto[1]-=ahoP;det[1].push('−'+fm(ahoP)+' ahorro automático pendiente de registrar');}
   const tc=getTCEstado(yr,mi), rest=dm-hoyD, labels=[],real=[],proy=[],et=[];
+  // Tarjeta: los consumos del estado que se paga este mes, en su día real. Lo que se
+  // compró antes de empezar el mes ya es deuda el día 1. Así se ve cómo cada consumo
+  // reduce lo que de verdad te queda, aunque el banco lo cobre al pagar la tarjeta.
+  const deuda=new Array(dm+1).fill(0);
+  const estTC=(db.tcPagos||[]).filter(x=>x.periodoImport&&x.periodoImport.anyo===yr&&x.periodoImport.mes===MN[mi]);
+  estTC.forEach(x=>(x.detalle||[]).forEach(t=>{
+    const f=parseLocalDate(t.fecha);
+    const dia=(f.getFullYear()<yr||(f.getFullYear()===yr&&f.getMonth()<mi))?1:Math.min(f.getDate(),dm);
+    deuda[dia]+=t.monto||0;
+    det[dia].push('💳 −'+fm(t.monto||0)+' '+String(t.descripcion||'').slice(0,24));
+  }));
+  for(let d=1;d<=dm;d++)deuda[d]+=deuda[d-1];
+  const hayTC=estTC.length>0&&tc>0;
+  const neta=[];
   let run=ini;
   for(let d=1;d<=dm;d++){
     labels.push(d+' '+PN_MES_C[mi]);
-    if(d<=hoyD){run+=neto[d];real.push(d===hoyD?ef:run);proy.push(d===hoyD?ef:null);et.push(neto[d]);}
+    if(d<=hoyD){run+=neto[d];real.push(d===hoyD?ef:run);proy.push(d===hoyD?ef:null);et.push(neto[d]);neta.push((d===hoyD?ef:run)-deuda[d]);}
     else{real.push(null);et.push(0);
-      proy.push(d===dm?fin:ef-p.variablesProyectadas*(d-hoyD)/Math.max(1,rest));}
+      proy.push(d===dm?fin:ef-p.variablesProyectadas*(d-hoyD)/Math.max(1,rest));
+      const n0=ef-deuda[hoyD];neta.push(d===dm?fin:n0+(fin-n0)*(d-hoyD)/Math.max(1,rest));}
   }
-  if(tc>0)det[dm]=['−'+fm(tc)+' pago de la tarjeta (estado del mes)'];
+  if(tc>0)det[dm].push('−'+fm(tc)+' pago de la tarjeta (estado del mes)');
   const span=Math.max(...real.filter(v=>v!=null),fin,ini)-Math.min(...real.filter(v=>v!=null),fin,ini);
   et.min=Math.max(15,span*0.04); // solo se rotulan los movimientos que mueven la línea
   pnChart('pn-c-cash',{type:'line',data:{labels,datasets:[
     {label:'Cash real',data:real,borderColor:PN_COL.cash,backgroundColor:'rgba(168,213,181,.10)',fill:true,borderWidth:2,stepped:false,tension:0,
       pointRadius:real.map((v,i)=>v!=null&&neto[i+1]?3:0),pointBackgroundColor:real.map((v,i)=>neto[i+1]>0?'#7ee2a8':'#f4a29a'),pointBorderWidth:0,pointHoverRadius:6},
     {label:'Proyección (egresos que faltan)',data:proy,borderColor:PN_COL.cash,borderDash:[5,4],borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:0,fill:false},
-  ]},plugins:[pnEtiquetas],options:pnOpts({plugins:Object.assign(pnOpts().plugins,{pnEtiquetas:et,
+  ].concat(hayTC?[{label:'💳 Descontando la tarjeta',data:neta,borderColor:PN_COL.malo,borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:0,fill:false,
+    segment:{borderDash:c=>c.p0DataIndex>=hoyD-1?[5,4]:undefined}}]:[])},plugins:[pnEtiquetas],options:pnOpts({plugins:Object.assign(pnOpts().plugins,{pnEtiquetas:et,
     tooltip:Object.assign({},pnOpts().plugins.tooltip,{callbacks:{
       label:c=>c.raw==null||(c.datasetIndex===1&&c.dataIndex<hoyD-1)?null:' '+c.dataset.label+': '+pnFs(c.raw),
+      title:items=>items[0].label,
       afterBody:items=>{const i=items[0].dataIndex+1;return det[i].slice(0,6).concat(det[i].length>6?['… y '+(det[i].length-6)+' más']:[]);}}})})})});
-  if(nota)nota.innerHTML=`Empezaste el mes con <strong>${pnFs(ini)}</strong> y hoy tienes <strong>${pnFs(ef)}</strong>. `+
+  if(nota)nota.innerHTML=`Empezaste el mes con <strong>${pnFs(ini)}</strong> y hoy tienes <strong>${pnFs(ef)}</strong> en el banco`+
+    (hayTC?`; descontando lo que ya debes en la tarjeta (${fm(deuda[hoyD])}), te quedan <strong>${pnFs(ef-deuda[hoyD])}</strong>. `:'. ')+
     `Egresos proyectados del mes: <strong>${fm(p.egrProyectado)}</strong> (faltan ~${fm(p.variablesProyectadas)} de gasto variable`+(tc>0?` y la tarjeta, ${fm(tc)}`:`; la tarjeta del mes aún no está cargada`)+`). `+
-    `Cierras el mes con <strong>${pnFs(fin)}</strong>. Toca un punto para ver los movimientos del día.`;
+    `Cierras el mes con <strong>${pnFs(fin)}</strong>. Toca un punto para ver los movimientos del día (💳 = consumo con tarjeta).`;
 }
 
 // ── 2. Ingreso pasivo contra gastos fijos y gasto típico ──
@@ -5839,7 +5867,7 @@ async function confirmarTC(){
 
   await save();
   cancelarTC();
-  recalcTodo();refreshDash();renderReg();renderDiferidosTracker();updateTCTracker();
+  recalcTodo();refreshDash();renderReg();renderDiferidosTracker();updateTCTracker();pnRefrescar();
   toast(`✅ TC BG importada — ${fm(totalTC)} registrado en ${importMes} ${importAnyo}`);
 }
 

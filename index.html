@@ -3198,12 +3198,32 @@ function pnCartera(){
 }
 
 // ── Proyección mes a mes (k=0: hoy). sim: {monto,dest,k0} ──
-function pnProyectar(meses,sim){
-  const now=new Date(), T=pnTasas();
+// Reparto al vencer (opc.reparto, por defecto sí): cada meta que no es el fondo de
+// emergencia entrega su saldo al cerrar el plazo, como hiciste con «Intocable», y se
+// reparte igual que la recomendación: primero el fondo de emergencia hasta 3 meses de
+// gasto típico, luego ganado hasta el tope del perfil (Conservador mientras falte
+// colchón, Balanceado después) y el resto a plazo fijo. La meta sigue con su aporte.
+function pnProyectar(meses,sim,opc){
+  const now=new Date(), T=pnTasas(), reparto=!(opc&&opc.reparto===false);
   let gan=(db.inv.ganado||[]).filter(i=>!i.ventaReal).reduce((s,i)=>s+(i.cap||0),0);
   const pfs=(db.inv.plazo||[]).map(i=>({cap:i.cap||0,tm:(i.tasaA||0)/1200}));
-  const metas=(db.inv.metas||[]).map(inv=>({id:inv.id,saldo:pnSaldoMeta(inv),tm:(inv.tasaA||0)/1200,
-    ap:ahorrosEsperadosMes(now.getFullYear(),now.getMonth()).filter(a=>a.id===inv.id).reduce((s,a)=>s+a.base,0)}));
+  const metas=(db.inv.metas||[]).map(inv=>{
+    let kFin=null;const pl=Math.max(1,Math.round(inv.plazo||12));
+    if(inv.fi){kFin=pnKDe(addM(inv.fi,pl));while(kFin<1)kFin+=pl;}
+    return {id:inv.id,saldo:pnSaldoMeta(inv),tm:(inv.tasaA||0)/1200,pl,kFin,
+      emerg:/emergencia/i.test((inv.nombre||'')+' '+(inv.desc||'')),
+      ap:ahorrosEsperadosMes(now.getFullYear(),now.getMonth()).filter(a=>a.id===inv.id).reduce((s,a)=>s+a.base,0)};
+  });
+  if(reparto&&!metas.some(m=>m.emerg))metas.push({id:'emerg',saldo:0,tm:T.metaA/1200,emerg:true,ap:0,kFin:null});
+  const objE=PN_MESES_EMERG*pnGastoTipico();
+  const repartir=amt=>{
+    const em=metas.find(m=>m.emerg), eS=metas.filter(m=>m.emerg).reduce((s,m)=>s+m.saldo,0);
+    const e=Math.min(amt,Math.max(0,objE-eS));em.saldo+=e;
+    const R=amt-e, perfil=(objE-eS-e)>0.5?PN_PERFILES[0]:PN_PERFILES[1];
+    const tot=gan+pfs.reduce((s,x)=>s+x.cap,0)+metas.reduce((s,x)=>s+x.saldo,0)+R;
+    const g=Math.min(R,Math.max(0,perfil.g*tot-gan));gan+=g;
+    if(R-g>0.005)pfs.push({cap:R-g,tm:T.pfA/1200});
+  };
   const rows=[];
   for(let k=0;k<=meses;k++){
     if(k>0){
@@ -3211,7 +3231,11 @@ function pnProyectar(meses,sim){
       pfs.forEach(p=>p.cap*=1+p.tm);
       const t=pnFecha(k), ap=ahorrosEsperadosMes(t.getFullYear(),t.getMonth());
       // Al terminar su plazo, la meta se renueva con el mismo aporte (así ha venido ahorrando)
-      metas.forEach(m=>{const e=ap.filter(a=>a.id===m.id);if(e.length)m.ap=e.reduce((s,a)=>s+a.base,0);m.saldo=m.saldo*(1+m.tm)+(m.ap||0);});
+      metas.forEach(m=>{const e=ap.filter(a=>a.id===m.id);if(e.length)m.ap=e.reduce((s,a)=>s+a.base,0);
+        // vence: entrega lo acumulado (antes del aporte del mes, que abre el ciclo nuevo)
+        if(reparto&&!m.emerg&&m.kFin===k){const v=m.saldo*(1+m.tm);m.saldo=0;m.kFin+=m.pl;repartir(v);}
+        else m.saldo=m.saldo*(1+m.tm);
+        m.saldo+=(m.ap||0);});
     }
     if(sim&&sim.monto>0&&k===sim.k0){
       if(sim.dest==='gan')gan+=sim.monto;
@@ -3367,10 +3391,13 @@ function renderPanelPasivo(base,F){
     ref('🏠 Gastos fijos',F.mediana,[8,4]),ref('🛒 Gasto total típico',tip,[2,3]),
   ]},options:pnOpts({scales:{x:pnOpts().scales.x,y:Object.assign({},pnOpts().scales.y,{stacked:true})}})});
   const T=pnTasas(), r0=base[0], kF=pnCruce(base,F.mediana), kT=pnCruce(base,tip);
+  const kSin=pnCruce(pnProyectar(600,null,{reparto:false}),tip);
   const nota=document.getElementById('pn-n-pasivo');
   if(nota)nota.innerHTML=`Hoy tu capital gana <strong>${fm(r0.pas)}</strong> al mes (ganado ${fm(r0.pGan)}, plazo fijo ${fm(r0.pPF)}, metas ${fm(r0.pMeta)}).<br>`+
     `🏠 Cubrir tus gastos fijos (${fm(F.mediana)}/mes${F.cats.length?': '+F.cats.join(' · '):''}): <strong>${kF===0?'✅ ya los cubre':pnCuando(kF)}</strong>.<br>`+
-    `🛒 Cubrir tu gasto total típico (${fm(tip)}/mes, con tarjeta, sin ahorro) — libertad financiera: <strong>${pnCuando(kT)}</strong>.`+
+    `🛒 Cubrir tu gasto total típico (${fm(tip)}/mes, con tarjeta, sin ahorro) — libertad financiera: <strong>${pnCuando(kT)}</strong>`+
+    (kSin!==kT?` (si dejaras todo en las metas: ${pnCuando(kSin)})`:'')+`.<br>`+
+    `🔄 Cada meta, al vencer, se reparte como en la recomendación: fondo de emergencia, luego ganado hasta el tope del perfil y el resto a plazo fijo; la meta sigue con su aporte.`+
     `<div style="font-size:10px;color:var(--tx3);margin-top:4px;">Mediana de tus últimos ${F.meses} meses cerrados: lo que dejó de repetirse no cuenta. Tasas: ganado ${(T.gan*100).toFixed(2)} %/mes (${T.ganN} lote${T.ganN===1?'':'s'} vendido${T.ganN===1?'':'s'}) · mejor PF ${T.pfA.toFixed(2)} % · meta ${T.metaA.toFixed(2)} %.</div>`;
 }
 

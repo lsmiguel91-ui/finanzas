@@ -236,7 +236,12 @@ Dashboard (`efectivoHoy`, `cashRealFinMes`, `calcProyeccion`, `ahorrosEsperadosM
   Se recomienda Conservador mientras falte fondo de emergencia; luego Balanceado.
 - Supuestos de `pnProyectar`: ganado al rendimiento real de los lotes vendidos (tu
   parte, vía `retornoGanado`), PF y metas a su `tasaA`, todo reinvertido; las metas se
-  renuevan con su aporte actual. Meta de la finca: `PN_META_FINCA`.
+  renuevan con su aporte actual. **Al vencer, cada meta (salvo el fondo de emergencia)
+  entrega su saldo y se reparte como la recomendación** (emergencia → ganado hasta el
+  tope del perfil → PF); `pnProyectar(m,sim,{reparto:false})` da el caso sin reparto y
+  la nota muestra ambas fechas (pedido del usuario, 21-nov-2026: sin reparto el morado
+  de metas dominaba y parecía que convenía invertir en metas). Meta de la finca:
+  `PN_META_FINCA`.
 - Paleta de series validada para el fondo oscuro: ganado `#c97d26`, PF `#1fa196`,
   metas `#8a6be6`; recomendado `#f2c94c`, mal año `#e07a6a`.
 - Para capturar pantallas en pruebas: hacerlo por tarjeta con la gráfica a la vista;

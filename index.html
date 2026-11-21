@@ -568,23 +568,32 @@ details[open] summary::before{transform:rotate(90deg);}
 <style>
 .pn-card{margin-bottom:14px;}
 .pn-tit{font-weight:700;font-size:14px;margin-bottom:2px;}
-.pn-tit2{font-weight:600;font-size:12px;color:var(--tx2);margin:12px 0 4px;}
 .pn-sub{font-size:11px;color:var(--tx3);margin-bottom:8px;line-height:1.4;}
-.pn-graf{position:relative;height:240px;}
-.pn-nota{font-size:12px;color:var(--tx2);margin-top:8px;line-height:1.5;}
+.pn-graf{position:relative;height:250px;}
+.pn-nota{font-size:12px;color:var(--tx2);margin-top:8px;line-height:1.55;}
 .pn-nota strong{color:var(--tx);}
 .pn-hz{display:flex;gap:6px;margin-bottom:6px;}
 .pn-hz button{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2);border-radius:14px;padding:4px 12px;font-size:11px;font-family:'Outfit',sans-serif;cursor:pointer;}
 .pn-hz button.act{background:var(--ac5);color:var(--tx);border-color:var(--ac5);}
-.pn-sim{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.pn-sim label{display:flex;flex-direction:column;font-size:10px;color:var(--tx3);gap:3px;}
-.pn-sim input,.pn-sim select{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:8px;font-size:14px;font-family:'Outfit',sans-serif;width:100%;min-width:0;}
+.pn-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;-webkit-overflow-scrolling:touch;}
+.pn-chips button{flex:0 0 auto;text-align:left;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:10px;padding:7px 10px;font-size:11px;font-family:'Outfit',sans-serif;cursor:pointer;line-height:1.35;max-width:190px;}
+.pn-chips button span{color:var(--tx3);font-size:10px;}
+.pn-chips button.act{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset;}
+.pn-man{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.pn-man label{display:flex;flex-direction:column;font-size:10px;color:var(--tx3);gap:3px;}
+.pn-man input,.pn-man select{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:8px;font-size:14px;font-family:'Outfit',sans-serif;width:100%;min-width:0;}
 .pn-kpi{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;}
 .pn-kpi .l{font-size:10px;color:var(--tx3);}
-.pn-kpi .v{font-family:'DM Mono',monospace;font-size:17px;font-weight:500;color:var(--tx);margin-top:2px;}
+.pn-kpi .v{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:var(--tx);margin-top:2px;}
 .pn-kpi .s{font-size:10px;color:var(--tx3);margin-top:2px;}
-.pn-pie{font-size:10px;color:var(--tx3);font-style:italic;margin:4px 0 18px;}
-@media(max-width:520px){.pn-sim{grid-template-columns:1fr 1fr;}.pn-sim label:first-child{grid-column:1/-1;}}
+.pn-reco{background:rgba(242,201,76,.07);border:1px solid rgba(242,201,76,.25);border-radius:10px;padding:9px 11px;margin:8px 0;font-size:12px;line-height:1.55;color:var(--tx2);}
+.pn-tab{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;}
+.pn-tab th{color:var(--tx3);font-weight:500;text-align:right;padding:4px 3px;font-size:10px;}
+.pn-tab td{text-align:right;padding:5px 3px;border-top:1px solid var(--bd);font-family:'DM Mono',monospace;color:var(--tx2);}
+.pn-tab td:first-child,.pn-tab th:first-child{text-align:left;font-family:'Outfit',sans-serif;}
+.pn-tab tr.pn-sel td{color:var(--tx);background:rgba(242,201,76,.08);}
+.pn-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;}
+.pn-pie{font-size:10px;color:var(--tx3);font-style:italic;margin:4px 0 18px;line-height:1.5;}
 </style>
 <!-- ═══════════════ PANEL (gráficas vivas) ═══════════════ -->
 <div id="tab-panel" class="tp">
@@ -593,35 +602,38 @@ details[open] summary::before{transform:rotate(90deg);}
 
   <div class="card pn-card" style="--ca:#a8d5b5;">
     <div class="pn-tit">💵 Cash del mes, día a día</div>
-    <div class="pn-sub">Línea llena: lo que ya pasó. Punteada: proyección a fin de mes y al mes siguiente.</div>
+    <div class="pn-sub">Cada ingreso sube la línea (+) y cada egreso la baja (−). La parte punteada son los egresos que faltan en el mes.</div>
     <div class="pn-graf"><canvas id="pn-c-cash" role="img" aria-label="Cash del mes día a día"></canvas></div>
     <div class="pn-nota" id="pn-n-cash"></div>
   </div>
 
   <div class="card pn-card" style="--ca:#c97d26;">
-    <div class="pn-tit">🌱 Ingreso pasivo contra gasto</div>
-    <div class="pn-sub">Lo que tu capital gana al mes (ganado, plazos fijos y metas) frente a lo que gastas. Cuando las áreas pasen la línea blanca, eres libre financieramente.</div>
+    <div class="pn-tit">🌱 Ingreso pasivo contra tus gastos</div>
+    <div class="pn-sub">Lo que tu capital gana al mes, por fuente, frente a tus gastos fijos y a tu gasto total típico.</div>
     <div class="pn-hz" id="pn-hz"></div>
-    <div class="pn-graf"><canvas id="pn-c-pasivo" role="img" aria-label="Ingreso pasivo mensual por fuente frente al gasto mensual"></canvas></div>
+    <div class="pn-graf"><canvas id="pn-c-pasivo" role="img" aria-label="Ingreso pasivo mensual por fuente frente a gastos fijos y gasto típico"></canvas></div>
     <div class="pn-nota" id="pn-n-pasivo"></div>
   </div>
 
   <div class="card pn-card" style="--ca:#f2c94c;">
-    <div class="pn-tit">🎛️ Simulador: ¿y si invierto más?</div>
-    <div class="pn-sub">Usa tus tasas reales registradas en la app.</div>
-    <div class="pn-sim">
-      <label>Monto $<input id="pn-s-monto" type="number" inputmode="decimal" min="0" step="100" placeholder="p. ej. un cobro" oninput="renderPanelSim()"></label>
-      <label>En<select id="pn-s-dest" onchange="renderPanelSim()"></select></label>
-      <label>Cuándo<select id="pn-s-cuando" onchange="renderPanelSim()"></select></label>
+    <div class="pn-tit">🧭 ¿Qué hago con el dinero que se libera?</div>
+    <div class="pn-sub">Lo que vence en los próximos 12 meses. Elige uno y compara tres caminos: cuánto ganas con cada uno.</div>
+    <div class="pn-chips" id="pn-d-chips"></div>
+    <div class="pn-man" id="pn-d-manual" style="display:none;">
+      <label>Monto $<input id="pn-d-monto" type="number" inputmode="decimal" min="0" step="100" placeholder="p. ej. un cobro" oninput="renderPanelDecision()"></label>
+      <label>Cuándo<select id="pn-d-cuando" onchange="renderPanelDecision()"></select></label>
     </div>
-    <div class="pn-nota" id="pn-n-sim"></div>
-    <div class="pn-tit2">Ingreso pasivo al mes</div>
-    <div class="pn-graf"><canvas id="pn-c-sim" role="img" aria-label="Ingreso pasivo con y sin la inversión simulada"></canvas></div>
-    <div class="pn-tit2">Patrimonio invertido hacia la finca</div>
-    <div class="pn-graf"><canvas id="pn-c-pat" role="img" aria-label="Patrimonio proyectado con y sin la inversión simulada, frente a la meta"></canvas></div>
-    <div class="pn-nota" id="pn-n-pat"></div>
+    <div class="pn-graf"><canvas id="pn-c-dec" role="img" aria-label="Ganancia acumulada de tres opciones de inversión"></canvas></div>
+    <div class="pn-nota" id="pn-n-dec"></div>
   </div>
-  <div class="pn-pie">Proyección con las tasas registradas; ganado con el rendimiento real de tus lotes vendidos (tu 50 %). Los intereses y retornos se reinvierten y las metas se renuevan con su aporte actual. No es una garantía.</div>
+
+  <div class="card pn-card" style="--ca:#8a6be6;">
+    <div class="pn-tit">⚖️ Tu portafolio: cuánto ganas y cuánto arriesgas</div>
+    <div class="pn-sub">Lo que ganaría todo tu capital en un año con cada reparto: barra dorada en un año normal, coral si el ganado tiene un mal año.</div>
+    <div class="pn-graf"><canvas id="pn-c-port" role="img" aria-label="Ganancia anual en año normal y en mal año por perfil de portafolio"></canvas></div>
+    <div class="pn-nota" id="pn-n-port"></div>
+  </div>
+  <div class="pn-pie">Proyecciones con tus tasas registradas; el ganado con el rendimiento real de tus lotes vendidos (tu 50 %). Los intereses se reinvierten y las metas se renuevan con su aporte actual. Gastos: mediana de los últimos 3 meses cerrados. No es una garantía ni asesoría profesional.</div>
 </div>
 
 <!-- ═══════════════ REGISTRO ═══════════════ -->
@@ -3082,18 +3094,31 @@ function renderFincaTracker(){
 }
 
 // ════════════════════════════════════════
-//  PANEL — gráficas vivas (cash diario, pasivo vs gasto, simulador, patrimonio)
+//  PANEL — gráficas vivas y asesor de decisiones
 // ════════════════════════════════════════
 // Todo sale de las mismas funciones del Dashboard (efectivoHoy, cashRealFinMes,
-// calcProyeccion, ahorrosEsperadosMes…): el panel no tiene cifras propias.
-const PN_COL={gan:'#c97d26',pf:'#1fa196',meta:'#8a6be6',cash:'#a8d5b5',gasto:'#e8f5e9',base:'#6aaa85',sim:'#f2c94c',grid:'rgba(168,213,181,.10)',tick:'#6aaa85'};
+// calcProyeccion, ahorrosEsperadosMes, calcMetaConRetiros…): el panel no tiene cifras
+// propias. Los promedios usan la MEDIANA de 6 meses cerrados: un pago único (p. ej.
+// cancelar el carro) no la arrastra, como sí arrastraba el promedio.
+const PN_COL={gan:'#c97d26',pf:'#1fa196',meta:'#8a6be6',cash:'#a8d5b5',ref:'#e8f5e9',base:'#6aaa85',sim:'#f2c94c',malo:'#e07a6a',grid:'rgba(168,213,181,.10)',tick:'#6aaa85'};
 const PN_META_FINCA=100000;
 const PN_DIAS_MES=30.4;
 const PN_MES_C=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-let _pnCharts={}, _pnHz=24;
+const PN_PERDIDA_GANADO=0.25;   // «mal año» del ganado: misma escala que la tabla de riesgo de Inversiones
+const PN_MESES_EMERG=3;         // fondo de emergencia = 3 meses de gasto típico
+const PN_PERFILES=[
+  {id:'cons',nom:'🛡️ Conservador',g:.20,p:.50,m:.30,nota:'el modelo 20/50/30 de Inversiones'},
+  {id:'bal', nom:'⚖️ Balanceado', g:.40,p:.40,m:.20,nota:'crece más sin depender del ganado'},
+  {id:'crec',nom:'🚀 Crecimiento',g:.60,p:.25,m:.15,nota:'máximo rendimiento, más riesgo'},
+];
+let _pnCharts={}, _pnHz=24, _pnEvento=null;
 const pnFmt0=v=>(v<0?'−':'')+'$'+Math.round(Math.abs(v)).toLocaleString('es-EC');
-const pnMesLbl=k=>{const d=new Date();const t=new Date(d.getFullYear(),d.getMonth()+k,1);return PN_MES_C[t.getMonth()]+' '+String(t.getFullYear()).slice(2);};
-const pnMesLargo=k=>{const d=new Date();const t=new Date(d.getFullYear(),d.getMonth()+k,1);return PN_MES_C[t.getMonth()]+'-'+t.getFullYear();};
+const pnFs=v=>(v<0?'−':'')+fm(v);
+const pnFecha=(k)=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth()+k,1);};
+const pnMesLbl=k=>{const t=pnFecha(k);return PN_MES_C[t.getMonth()]+' '+String(t.getFullYear()).slice(2);};
+const pnMesLargo=k=>{const t=pnFecha(k);return PN_MES_C[t.getMonth()]+'-'+t.getFullYear();};
+const pnKDe=f=>{const d=parseLocalDate(f),n=new Date();return (d.getFullYear()-n.getFullYear())*12+d.getMonth()-n.getMonth();};
+const pnMediana=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y),h=Math.floor(s.length/2);return s.length%2?s[h]:(s[h-1]+s[h])/2;};
 function pnChart(id,cfg){
   if(_pnCharts[id]){try{_pnCharts[id].destroy();}catch(e){}}
   const cv=document.getElementById(id);if(!cv)return;
@@ -3104,66 +3129,85 @@ function pnOpts(extra){
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:true,position:'bottom',labels:{color:PN_COL.tick,boxWidth:10,boxHeight:10,font:{size:10,family:'Outfit'}}},
       tooltip:{backgroundColor:'#0c1a0e',borderColor:'#1f5c35',borderWidth:1,titleColor:'#e8f5e9',bodyColor:'#a8d5b5',
-        callbacks:{label:c=>c.raw==null?null:' '+c.dataset.label+': '+fm(c.raw)}}},
+        callbacks:{label:c=>c.raw==null?null:' '+c.dataset.label+': '+pnFs(c.raw)}}},
     scales:{x:{grid:{display:false},ticks:{color:PN_COL.tick,font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:7}},
       y:{grid:{color:PN_COL.grid},border:{display:false},ticks:{color:PN_COL.tick,font:{size:9},callback:v=>pnFmt0(v)}}}};
   return Object.assign(o,extra||{});
 }
 
-// Rendimiento mensual del ganado: el real de tus lotes vendidos (tu parte: capital + 50 %).
-// Sin lotes vendidos, la tasa registrada en los activos.
+// ── Datos base ──
 function pnTasaGanadoMes(){
   const vend=(db.inv.ganado||[]).filter(i=>i.ventaReal>0&&i.cap>0&&i.plazo>0);
   if(vend.length){
     const r=vend.map(i=>(retornoGanado(i,i.ventaReal)-i.cap)/i.cap/i.plazo);
-    return Math.max(0,r.reduce((s,x)=>s+x,0)/r.length);
+    return {r:Math.max(0,r.reduce((s,x)=>s+x,0)/r.length),n:vend.length};
   }
   const act=(db.inv.ganado||[]).filter(i=>!i.ventaReal&&i.tasa>0);
-  return act.length?act.reduce((s,i)=>s+i.tasa/100,0)/act.length:0;
-}
-// Gasto mensual de consumo: promedio de los últimos 3 meses cerrados (efectivo + TC).
-// El ahorro no es gasto: es lo que alimenta las inversiones.
-function pnGastoMensual(){
-  const now=new Date();const out=[];
-  for(let k=1;k<=6&&out.length<3;k++){
-    const t=new Date(now.getFullYear(),now.getMonth()-k,1);
-    const h=db.hist.find(x=>x.a===t.getFullYear()&&x.m===MN[t.getMonth()]);
-    if(!h)continue;
-    out.push((h.ev||0)+(h.imp||0)+(h.deu||0)+getTCMes(t.getFullYear(),t.getMonth()));
-  }
-  return out.length?out.reduce((s,x)=>s+x,0)/out.length:0;
-}
-function pnNetoMensual(){
-  const now=new Date();const out=[];
-  for(let k=1;k<=6&&out.length<3;k++){
-    const t=new Date(now.getFullYear(),now.getMonth()-k,1);
-    const h=db.hist.find(x=>x.a===t.getFullYear()&&x.m===MN[t.getMonth()]);
-    if(h)out.push(difMes(h));
-  }
-  return out.length?out.reduce((s,x)=>s+x,0)/out.length:0;
+  return {r:act.length?act.reduce((s,i)=>s+i.tasa/100,0)/act.length:0,n:0};
 }
 function pnTasas(){
   const pf=(db.inv.plazo||[]).map(i=>i.tasaA||0), me=(db.inv.metas||[]).map(i=>i.tasaA||0);
-  return {gan:pnTasaGanadoMes(), pfA:pf.length?Math.max(...pf):(me.length?Math.max(...me):0), metaA:me.length?Math.max(...me):0};
+  const G=pnTasaGanadoMes();
+  return {gan:G.r,ganN:G.n,ganA:Math.pow(1+G.r,12)-1,
+    pfA:pf.length?Math.max(...pf):(me.length?Math.max(...me):0), metaA:me.length?Math.max(...me):0};
 }
-// Proyección mes a mes. k=0 es el mes en curso (saldos de hoy).
-// sim: {monto, dest:'gan'|'pf'|'meta', k0}
+// Últimos n meses cerrados con datos (más reciente primero)
+function pnMesesCerrados(n){
+  const now=new Date(),out=[];
+  for(let k=1;k<=18&&out.length<n;k++){
+    const t=new Date(now.getFullYear(),now.getMonth()-k,1);
+    if(t<new Date(INICIO_TRACKING.a,MN.indexOf(INICIO_TRACKING.m),1))break;
+    const h=db.hist.find(x=>x.a===t.getFullYear()&&x.m===MN[t.getMonth()]);
+    if(h)out.push({yr:t.getFullYear(),mi:t.getMonth(),h});
+  }
+  return out;
+}
+const pnEsFijo=m=>(CAT_FIJOS.includes(m.categoria)&&!CAT_AHO.includes(m.categoria))||(m.categoria==='Otros'&&m.monto>=UMBRAL_OTROS);
+// Gastos fijos: la misma regla de «fijo» de la proyección del Dashboard, sin el ahorro
+// (el ahorro no es gasto: alimenta las inversiones). Mediana POR CATEGORÍA de los últimos
+// 3 meses cerrados y luego la suma: un gasto que dejó de repetirse (el carro ya pagado,
+// un «Otros» grande de una sola vez) sale solo, y uno que se repite queda.
+const PN_MESES_REF=3;
+function pnFijos(){
+  const meses=pnMesesCerrados(PN_MESES_REF), porCat={};
+  meses.forEach(({yr,mi},idx)=>{
+    (db.movimientos||[]).forEach(m=>{
+      if(m.tipo!=='egreso'||esFlujoInv(m)||!pnEsFijo(m))return;
+      const d=parseLocalDate(m.fecha);if(d.getFullYear()!==yr||d.getMonth()!==mi)return;
+      (porCat[m.categoria]=porCat[m.categoria]||new Array(meses.length).fill(0))[idx]+=m.monto;
+    });
+  });
+  const det=Object.entries(porCat).map(([c,v])=>({c,v:pnMediana(v)})).filter(x=>x.v>0.5);
+  return {mediana:det.reduce((s,x)=>s+x.v,0),meses:meses.length,cats:det.map(x=>x.c+' '+fm(x.v))};
+}
+// Gasto total típico (consumo: efectivo + TC, sin ahorro). Mediana de los últimos 3 meses cerrados.
+function pnGastoTipico(){
+  return pnMediana(pnMesesCerrados(PN_MESES_REF).map(({yr,mi,h})=>(h.ev||0)+(h.imp||0)+(h.deu||0)+getTCMes(yr,mi)));
+}
+function pnSaldoMeta(inv){
+  return calcMetaConRetiros(inv.fi||today(),inv.aporte||0,inv.tasaA||0,Math.min(inv.plazo||12,getMesesHastaHoy(inv.fi)),inv.retiros||[],inv.aportesExtra||[],inv.tramosAporte||[]).saldo||0;
+}
+function pnCartera(){
+  const gan=(db.inv.ganado||[]).filter(i=>!i.ventaReal).reduce((s,i)=>s+(i.cap||0),0);
+  const pf=(db.inv.plazo||[]).reduce((s,i)=>s+(i.cap||0),0);
+  const metas=(db.inv.metas||[]).reduce((s,i)=>s+pnSaldoMeta(i),0);
+  const emerg=(db.inv.metas||[]).filter(i=>/emergencia/i.test((i.nombre||'')+' '+(i.desc||''))).reduce((s,i)=>s+pnSaldoMeta(i),0);
+  return {gan,pf,metas,emerg,tot:gan+pf+metas};
+}
+
+// ── Proyección mes a mes (k=0: hoy). sim: {monto,dest,k0} ──
 function pnProyectar(meses,sim){
   const now=new Date(), T=pnTasas();
   let gan=(db.inv.ganado||[]).filter(i=>!i.ventaReal).reduce((s,i)=>s+(i.cap||0),0);
   const pfs=(db.inv.plazo||[]).map(i=>({cap:i.cap||0,tm:(i.tasaA||0)/1200}));
-  const metas=(db.inv.metas||[]).map(inv=>{
-    const r=calcMetaConRetiros(inv.fi||today(),inv.aporte||0,inv.tasaA||0,Math.min(inv.plazo||12,getMesesHastaHoy(inv.fi)),inv.retiros||[],inv.aportesExtra||[],inv.tramosAporte||[]);
-    const apHoy=ahorrosEsperadosMes(now.getFullYear(),now.getMonth()).filter(a=>a.id===inv.id).reduce((s,a)=>s+a.base,0);
-    return {id:inv.id,saldo:r.saldo||0,tm:(inv.tasaA||0)/1200,ap:apHoy};
-  });
+  const metas=(db.inv.metas||[]).map(inv=>({id:inv.id,saldo:pnSaldoMeta(inv),tm:(inv.tasaA||0)/1200,
+    ap:ahorrosEsperadosMes(now.getFullYear(),now.getMonth()).filter(a=>a.id===inv.id).reduce((s,a)=>s+a.base,0)}));
   const rows=[];
   for(let k=0;k<=meses;k++){
     if(k>0){
       gan*=1+T.gan;
       pfs.forEach(p=>p.cap*=1+p.tm);
-      const t=new Date(now.getFullYear(),now.getMonth()+k,1);
-      const ap=ahorrosEsperadosMes(t.getFullYear(),t.getMonth());
+      const t=pnFecha(k), ap=ahorrosEsperadosMes(t.getFullYear(),t.getMonth());
       // Al terminar su plazo, la meta se renueva con el mismo aporte (así ha venido ahorrando)
       metas.forEach(m=>{const e=ap.filter(a=>a.id===m.id);if(e.length)m.ap=e.reduce((s,a)=>s+a.base,0);m.saldo=m.saldo*(1+m.tm)+(m.ap||0);});
     }
@@ -3173,132 +3217,207 @@ function pnProyectar(meses,sim){
       else metas.push({id:'sim',saldo:sim.monto,tm:T.metaA/1200});
     }
     const capPF=pfs.reduce((s,p)=>s+p.cap,0), capMe=metas.reduce((s,m)=>s+m.saldo,0);
-    rows.push({k,gan,pf:capPF,meta:capMe,
-      pGan:gan*T.gan, pPF:pfs.reduce((s,p)=>s+p.cap*p.tm,0), pMeta:metas.reduce((s,m)=>s+m.saldo*m.tm,0),
-      pat:gan+capPF+capMe});
+    rows.push({k,pGan:gan*T.gan,pPF:pfs.reduce((s,p)=>s+p.cap*p.tm,0),pMeta:metas.reduce((s,m)=>s+m.saldo*m.tm,0),pat:gan+capPF+capMe});
   }
   rows.forEach(r=>r.pas=r.pGan+r.pPF+r.pMeta);
   return rows;
 }
-function pnCruce(rows,gasto){const r=rows.find(x=>x.pas>=gasto&&gasto>0);return r?r.k:null;}
-function pnLlegaMeta(rows){const r=rows.find(x=>x.pat>=PN_META_FINCA);return r?r.k:null;}
+const pnCruce=(rows,v)=>{const r=v>0?rows.find(x=>x.pas>=v):null;return r?r.k:null;};
+const pnLlegaMeta=rows=>{const r=rows.find(x=>x.pat>=PN_META_FINCA);return r?r.k:null;};
 function pnCuando(k){if(k===null)return 'más de 50 años';if(k===0)return 'ya';const a=Math.floor(k/12),m=k%12;return pnMesLargo(k)+' ('+(a?a+(a===1?' año':' años'):'')+(a&&m?' y ':'')+(m?m+(m===1?' mes':' meses'):'')+')';}
 
+// ── Dinero que se libera en los próximos 12 meses ──
+function pnEventos(){
+  const T=pnTasas(), hoy=today(), ev=[];
+  (db.inv.metas||[]).forEach(inv=>{
+    if(!inv.fi)return;const f0=parseLocalDate(addM(inv.fi,inv.plazo||12));f0.setDate(f0.getDate()-1); // último día del plazo
+    const f=f0.getFullYear()+'-'+String(f0.getMonth()+1).padStart(2,'0')+'-'+String(f0.getDate()).padStart(2,'0');const k=pnKDe(f);
+    if(f>=hoy&&k<=12){const v=saldoFinalMeta(inv);if(v>1)ev.push({id:'m'+inv.id,ico:'🎯',nom:'Meta «'+(inv.nombre||inv.desc)+'»',f,k,monto:v});}
+  });
+  (db.inv.plazo||[]).forEach(inv=>{
+    if(!inv.fi)return;const f=finReal(inv);const k=pnKDe(f);
+    if(f>=hoy&&k<=12)ev.push({id:'p'+inv.id,ico:'🏦',nom:/^PF/i.test(inv.nombre||'')?inv.nombre:'PF '+(inv.nombre||inv.desc),f,k,monto:retornoPF(inv)});
+  });
+  (db.inv.ganado||[]).filter(i=>!i.ventaReal).forEach(inv=>{
+    const f=inv.ff||inv.fventaEst||(inv.fi?finReal(inv):'');if(!f)return;const k=pnKDe(f);
+    if(f>=hoy&&k<=12)ev.push({id:'g'+inv.id,ico:'🐄',nom:'Venta '+(inv.desc||'lote'),f,k,monto:(inv.cap||0)*(1+T.gan*(inv.plazo||0)),est:true});
+  });
+  ev.sort((a,b)=>a.f.localeCompare(b.f));
+  // Mismo mes de vencimiento: también como bloque, que es como llega a la cuenta
+  const porMes={};ev.forEach(e=>{(porMes[e.k]=porMes[e.k]||[]).push(e);});
+  Object.entries(porMes).forEach(([k,l])=>{if(l.length>1&&l.every(e=>e.ico==='🎯'))ev.unshift({id:'mm'+k,ico:'🎁',nom:'Metas que vencen en '+pnMesLargo(+k),f:l[0].f,k:+k,monto:l.reduce((s,e)=>s+e.monto,0)});});
+  return ev;
+}
+
+// ════ Render ════
 function renderPanel(){
   if(!document.getElementById('tab-panel'))return;
   const now=new Date(), yr=now.getFullYear(), mi=now.getMonth();
-  const ef=efectivoHoy(yr,mi), fin=cashRealFinMes(yr,mi);
-  const gasto=pnGastoMensual();
-  const base=pnProyectar(600);
-  const pasHoy=base[0].pas;
-  const cob=gasto>0?pasHoy/gasto*100:0;
+  const ef=efectivoHoy(yr,mi), fin=cashRealFinMes(yr,mi), p=calcProyeccion();
+  const egrHoy=p.gastosFijos+p.gastosVariables+p.gastosImprevistos;
+  const F=pnFijos(), base=pnProyectar(600), r0=base[0];
+  const cob=F.mediana>0?r0.pas/F.mediana*100:0;
   const kp=[
-    {l:'💵 Efectivo hoy',v:ef==null?'—':fm(ef),s:'lo que debería tener el banco'},
-    {l:'📅 Fin de mes',v:fin==null?'—':fm(fin),s:'proyectado, con la TC'},
-    {l:'🌱 Pasivo por día',v:fm(pasHoy/PN_DIAS_MES),s:fm(pasHoy)+' al mes'},
-    {l:'🔥 Gasto por día',v:fm(gasto/PN_DIAS_MES),s:'el pasivo cubre el '+cob.toFixed(0)+' %'},
+    {l:'💵 Efectivo hoy',v:ef==null?'—':pnFs(ef),s:'fin de mes: '+(fin==null?'—':pnFs(fin))},
+    {l:'🧾 Egresos del mes',v:fm(egrHoy),s:'proyectado: '+fm(p.egrProyectado)},
+    {l:'🌱 Ingreso pasivo',v:fm(r0.pas/PN_DIAS_MES)+'/día',s:fm(r0.pas)+' al mes'},
+    {l:'🏠 Gastos fijos',v:fm(F.mediana)+'/mes',s:'el pasivo cubre el '+cob.toFixed(0)+' %'},
   ];
   const kel=document.getElementById('pn-kpis');
   if(kel)kel.innerHTML=kp.map(x=>`<div class="pn-kpi"><div class="l">${x.l}</div><div class="v">${x.v}</div><div class="s">${x.s}</div></div>`).join('');
   const hz=document.getElementById('pn-hz');
   if(hz)hz.innerHTML=[[24,'2 años'],[60,'5 años'],[120,'10 años']].map(([m,t])=>`<button class="${_pnHz===m?'act':''}" onclick="_pnHz=${m};renderPanel()">${t}</button>`).join('');
-  pnLlenarSim();
   if(typeof Chart==='undefined'){
     document.querySelectorAll('#tab-panel .pn-graf').forEach(g=>g.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--tx3);">📊 Gráfico no disponible sin conexión</div>');
   }else{
-    renderPanelCash(yr,mi,ef,fin);
-    renderPanelPasivo(base,gasto);
+    renderPanelCash(yr,mi,ef,fin,p);
+    renderPanelPasivo(base,F);
   }
-  renderPanelSim();
+  renderPanelDecision();
+  renderPanelPortafolio();
 }
 
-function renderPanelCash(yr,mi,ef,fin){
+// ── 1. Cash del mes: cada movimiento sube o baja la línea ──
+const pnEtiquetas={id:'pnEtiquetas',afterDatasetsDraw(ch){
+  const et=ch.options.plugins.pnEtiquetas;if(!et)return;
+  const meta=ch.getDatasetMeta(0),ctx=ch.ctx;
+  ctx.save();ctx.font='600 9px Outfit, sans-serif';
+  et.forEach((v,i)=>{
+    if(!v||Math.abs(v)<et.min)return;const pt=meta.data[i];if(!pt||pt.skip)return;
+    ctx.textAlign=i<2?'left':(i>et.length-3?'right':'center'); // que no tape el eje
+    ctx.fillStyle=v>0?'#7ee2a8':'#f4a29a';
+    ctx.fillText((v>0?'+':'−')+'$'+Math.round(Math.abs(v)),pt.x,v>0?pt.y-7:pt.y+13);
+  });
+  ctx.restore();
+}};
+function renderPanelCash(yr,mi,ef,fin,p){
   const nota=document.getElementById('pn-n-cash');
   const ini=saldoInicialMes(yr,mi);
   if(ini==null||ef==null){if(nota)nota.textContent='Sin datos del mes.';return;}
-  const hoyD=new Date().getDate(), dm=new Date(yr,mi+1,0).getDate(), dm2=new Date(yr,mi+2,0).getDate();
-  const porDia=new Array(dm+1).fill(0);
+  const hoyD=new Date().getDate(), dm=new Date(yr,mi+1,0).getDate();
+  const neto=new Array(dm+1).fill(0), det=Array.from({length:dm+1},()=>[]);
   (db.movimientos||[]).forEach(m=>{
     const d=parseLocalDate(m.fecha);
     if(d.getFullYear()!==yr||d.getMonth()!==mi)return;
-    const dia=Math.min(d.getDate(),hoyD); // lo registrado con fecha futura cuenta hoy, como en efectivoHoy
-    porDia[dia]+=m.tipo==='ingreso'?m.monto:-m.monto;
+    const dia=Math.min(d.getDate(),hoyD); // fecha futura: cuenta hoy, como en efectivoHoy
+    const v=m.tipo==='ingreso'?m.monto:-m.monto;
+    neto[dia]+=v;det[dia].push((v>0?'+':'−')+fm(v)+' '+(m.descripcion||m.categoria||'').slice(0,26));
   });
-  porDia[1]-=totalAhorrosPendientes(yr,mi); // débito automático: ya salió
-  const labels=[],real=[],proy=[];
+  const ahoP=totalAhorrosPendientes(yr,mi);
+  if(ahoP>0){neto[1]-=ahoP;det[1].push('−'+fm(ahoP)+' ahorro automático pendiente de registrar');}
+  const tc=getTCEstado(yr,mi), rest=dm-hoyD, labels=[],real=[],proy=[],et=[];
   let run=ini;
   for(let d=1;d<=dm;d++){
-    labels.push(d+'-'+PN_MES_C[mi]);
-    if(d<=hoyD){run+=porDia[d];real.push(d===hoyD?ef:run);proy.push(d===hoyD?ef:null);}
-    else real.push(null);
+    labels.push(d+' '+PN_MES_C[mi]);
+    if(d<=hoyD){run+=neto[d];real.push(d===hoyD?ef:run);proy.push(d===hoyD?ef:null);et.push(neto[d]);}
+    else{real.push(null);et.push(0);
+      proy.push(d===dm?fin:ef-p.variablesProyectadas*(d-hoyD)/Math.max(1,rest));}
   }
-  const p=calcProyeccion(), tc=getTCEstado(yr,mi), rest=dm-hoyD;
-  for(let d=hoyD+1;d<=dm;d++){
-    const v=ef-p.variablesProyectadas*(d-hoyD)/Math.max(1,rest)-(d===dm?tc:0);
-    proy.push(d===dm?fin:v);
-  }
-  const neto=pnNetoMensual();
-  const mi2=(mi+1)%12;
-  for(let d=1;d<=dm2;d++){labels.push(d+'-'+PN_MES_C[mi2]);real.push(null);proy.push(fin+neto*d/dm2);}
+  if(tc>0)det[dm]=['−'+fm(tc)+' pago de la tarjeta (estado del mes)'];
+  const span=Math.max(...real.filter(v=>v!=null),fin,ini)-Math.min(...real.filter(v=>v!=null),fin,ini);
+  et.min=Math.max(15,span*0.04); // solo se rotulan los movimientos que mueven la línea
   pnChart('pn-c-cash',{type:'line',data:{labels,datasets:[
-    {label:'Cash real',data:real,borderColor:PN_COL.cash,backgroundColor:'rgba(168,213,181,.12)',fill:true,borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:.15},
-    {label:'Proyección',data:proy,borderColor:PN_COL.cash,borderDash:[5,4],borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:.15,fill:false},
-  ]},options:pnOpts()});
-  if(nota)nota.innerHTML=`Empezaste el mes con <strong>${fm(ini)}</strong>${ini<0?' (negativo)':''}; hoy tienes <strong>${ef<0?'−':''}${fm(ef)}</strong>. `+
-    (tc>0?`A fin de mes, tras pagar la TC (${fm(tc)}), quedarías con <strong>${fin<0?'−':''}${fm(fin)}</strong>. `:`A fin de mes quedarías con <strong>${fin<0?'−':''}${fm(fin)}</strong> (la TC del mes aún no está cargada). `)+
-    `Al ritmo de los últimos meses (${neto>=0?'+':'−'}${fm(neto)} al mes), el mes siguiente cerraría en <strong>${fin+neto<0?'−':''}${fm(fin+neto)}</strong>.`;
+    {label:'Cash real',data:real,borderColor:PN_COL.cash,backgroundColor:'rgba(168,213,181,.10)',fill:true,borderWidth:2,stepped:false,tension:0,
+      pointRadius:real.map((v,i)=>v!=null&&neto[i+1]?3:0),pointBackgroundColor:real.map((v,i)=>neto[i+1]>0?'#7ee2a8':'#f4a29a'),pointBorderWidth:0,pointHoverRadius:6},
+    {label:'Proyección (egresos que faltan)',data:proy,borderColor:PN_COL.cash,borderDash:[5,4],borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:0,fill:false},
+  ]},plugins:[pnEtiquetas],options:pnOpts({plugins:Object.assign(pnOpts().plugins,{pnEtiquetas:et,
+    tooltip:Object.assign({},pnOpts().plugins.tooltip,{callbacks:{
+      label:c=>c.raw==null||(c.datasetIndex===1&&c.dataIndex<hoyD-1)?null:' '+c.dataset.label+': '+pnFs(c.raw),
+      afterBody:items=>{const i=items[0].dataIndex+1;return det[i].slice(0,6).concat(det[i].length>6?['… y '+(det[i].length-6)+' más']:[]);}}})})})});
+  if(nota)nota.innerHTML=`Empezaste el mes con <strong>${pnFs(ini)}</strong> y hoy tienes <strong>${pnFs(ef)}</strong>. `+
+    `Egresos proyectados del mes: <strong>${fm(p.egrProyectado)}</strong> (faltan ~${fm(p.variablesProyectadas)} de gasto variable`+(tc>0?` y la tarjeta, ${fm(tc)}`:`; la tarjeta del mes aún no está cargada`)+`). `+
+    `Cierras el mes con <strong>${pnFs(fin)}</strong>. Toca un punto para ver los movimientos del día.`;
 }
 
-function renderPanelPasivo(base,gasto){
-  const rows=base.slice(0,_pnHz+1), labels=rows.map(r=>pnMesLbl(r.k));
+// ── 2. Ingreso pasivo contra gastos fijos y gasto típico ──
+function renderPanelPasivo(base,F){
+  const tip=pnGastoTipico(), rows=base.slice(0,_pnHz+1), labels=rows.map(r=>pnMesLbl(r.k));
   const ds=(lbl,key,col)=>({label:lbl,data:rows.map(r=>r[key]),borderColor:col,backgroundColor:col+'88',fill:true,stack:'p',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,tension:.2});
+  const ref=(lbl,v,dash)=>({label:lbl,data:rows.map(()=>v),borderColor:PN_COL.ref,borderDash:dash,borderWidth:dash[0]>4?2:1.5,pointRadius:0,fill:false,stack:lbl});
   pnChart('pn-c-pasivo',{type:'line',data:{labels,datasets:[
     ds('🐄 Ganado','pGan',PN_COL.gan),ds('🏦 Plazo fijo','pPF',PN_COL.pf),ds('🎯 Metas','pMeta',PN_COL.meta),
-    {label:'🔥 Gasto mensual',data:rows.map(()=>gasto),borderColor:PN_COL.gasto,borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,stack:'g'},
+    ref('🏠 Gastos fijos',F.mediana,[8,4]),ref('🛒 Gasto total típico',tip,[2,3]),
   ]},options:pnOpts({scales:{x:pnOpts().scales.x,y:Object.assign({},pnOpts().scales.y,{stacked:true})}})});
-  const k=pnCruce(base,gasto), T=pnTasas(), r0=base[0];
+  const T=pnTasas(), r0=base[0], kF=pnCruce(base,F.mediana), kT=pnCruce(base,tip);
   const nota=document.getElementById('pn-n-pasivo');
-  if(nota)nota.innerHTML=`Hoy tu capital gana <strong>${fm(r0.pas)}</strong> al mes: ganado ${fm(r0.pGan)}, plazo fijo ${fm(r0.pPF)}, metas ${fm(r0.pMeta)}. Gastas ~<strong>${fm(gasto)}</strong> al mes. `+
-    `Reinvirtiendo todo, la libertad financiera llega: <strong>${pnCuando(k)}</strong>.`+
-    `<div style="font-size:10px;color:var(--tx3);margin-top:4px;">Tasas: ganado ${(T.gan*100).toFixed(2)} %/mes (tus lotes vendidos) · mejor PF ${T.pfA.toFixed(2)} % anual · meta ${T.metaA.toFixed(2)} % anual.</div>`;
+  if(nota)nota.innerHTML=`Hoy tu capital gana <strong>${fm(r0.pas)}</strong> al mes (ganado ${fm(r0.pGan)}, plazo fijo ${fm(r0.pPF)}, metas ${fm(r0.pMeta)}).<br>`+
+    `🏠 Cubrir tus gastos fijos (${fm(F.mediana)}/mes${F.cats.length?': '+F.cats.join(' · '):''}): <strong>${kF===0?'✅ ya los cubre':pnCuando(kF)}</strong>.<br>`+
+    `🛒 Cubrir tu gasto total típico (${fm(tip)}/mes, con tarjeta, sin ahorro) — libertad financiera: <strong>${pnCuando(kT)}</strong>.`+
+    `<div style="font-size:10px;color:var(--tx3);margin-top:4px;">Mediana de tus últimos ${F.meses} meses cerrados: lo que dejó de repetirse no cuenta. Tasas: ganado ${(T.gan*100).toFixed(2)} %/mes (${T.ganN} lote${T.ganN===1?'':'s'} vendido${T.ganN===1?'':'s'}) · mejor PF ${T.pfA.toFixed(2)} % · meta ${T.metaA.toFixed(2)} %.</div>`;
 }
 
-function pnLlenarSim(){
-  const d=document.getElementById('pn-s-dest'), c=document.getElementById('pn-s-cuando');
-  if(!d||d.options.length)return;
-  const T=pnTasas();
-  d.innerHTML=`<option value="gan">🐄 Ganado (${(T.gan*100).toFixed(2)} %/mes)</option><option value="pf">🏦 Plazo fijo (${T.pfA.toFixed(2)} %)</option><option value="meta">🎯 Meta (${T.metaA.toFixed(2)} %)</option>`;
-  c.innerHTML=Array.from({length:13},(_,k)=>`<option value="${k}">${k===0?'Este mes':pnMesLargo(k)}</option>`).join('');
+// ── 3. ¿Qué hago con este dinero? Tres caminos en una gráfica + recomendación ──
+function pnRecomendar(A,k0){
+  const C=pnCartera(), tip=pnGastoTipico();
+  const objEmerg=PN_MESES_EMERG*tip, faltaE=Math.max(0,objEmerg-C.emerg);
+  const e=Math.min(A,faltaE), R=A-e;
+  const perfil=faltaE>0?PN_PERFILES[0]:PN_PERFILES[1];
+  const totDesp=C.tot+A, room=Math.max(0,perfil.g*totDesp-C.gan);
+  const g=Math.min(R,room), p=R-g;
+  return {e,g,p,perfil,objEmerg,faltaE,C,pctGanDesp:totDesp>0?(C.gan+g)/totDesp*100:0};
 }
-function renderPanelSim(){
-  const monto=parseFloat((document.getElementById('pn-s-monto')||{}).value)||0;
-  const dest=(document.getElementById('pn-s-dest')||{}).value||'gan';
-  const k0=parseInt((document.getElementById('pn-s-cuando')||{}).value)||0;
-  const gasto=pnGastoMensual();
-  const base=pnProyectar(600), sim=pnProyectar(600,{monto,dest,k0});
-  const rb=base.slice(0,_pnHz+1), rs=sim.slice(0,_pnHz+1), labels=rb.map(r=>pnMesLbl(r.k));
-  const hay=monto>0;
-  if(typeof Chart!=='undefined'){
-    const line=(lbl,data,col,dash,w)=>({label:lbl,data,borderColor:col,borderDash:dash||[],borderWidth:w||2,pointRadius:0,pointHoverRadius:4,fill:false,tension:.2});
-    const dsP=[line('Como vas',rb.map(r=>r.pas),PN_COL.base)];
-    if(hay)dsP.push(line('Con tu decisión',rs.map(r=>r.pas),PN_COL.sim,null,2.5));
-    dsP.push(line('🔥 Gasto mensual',rb.map(()=>gasto),PN_COL.gasto,[6,4]));
-    pnChart('pn-c-sim',{type:'line',data:{labels,datasets:dsP},options:pnOpts()});
-    const dsT=[line('Como vas',rb.map(r=>r.pat),PN_COL.base)];
-    if(hay)dsT.push(line('Con tu decisión',rs.map(r=>r.pat),PN_COL.sim,null,2.5));
-    dsT.push(line('🏡 Meta finca',rb.map(()=>PN_META_FINCA),PN_COL.gasto,[6,4]));
-    pnChart('pn-c-pat',{type:'line',data:{labels,datasets:dsT},options:pnOpts()});
-  }
-  const kb=pnCruce(base,gasto), ks=pnCruce(sim,gasto), mb=pnLlegaMeta(base), ms=pnLlegaMeta(sim);
-  const n=document.getElementById('pn-n-sim'), np=document.getElementById('pn-n-pat');
-  const h=Math.min(_pnHz,base.length-1);
-  if(n)n.innerHTML=hay
-    ?`Con <strong>${fm(monto)}</strong> más en ${dest==='gan'?'ganado':dest==='pf'?'plazo fijo':'una meta'} desde ${pnMesLargo(k0)}, en ${pnMesLargo(h)} ganarías <strong>${fm(sim[h].pas)}</strong> al mes en vez de ${fm(base[h].pas)} (<strong>+${fm(sim[h].pas-base[h].pas)}</strong>). `+
-      `Libertad financiera: ${pnCuando(kb)} → <strong>${pnCuando(ks)}</strong>.`
-    :'Escribe un monto (por ejemplo, lo que recuperes de un cobro) y elige dónde invertirlo para comparar.';
-  if(np)np.innerHTML=`Hoy tienes <strong>${fm(base[0].pat)}</strong> invertido (${(base[0].pat/PN_META_FINCA*100).toFixed(1)} % de la finca). Llegas a ${fm(PN_META_FINCA)}: ${pnCuando(mb)}`+(hay?` → con tu decisión <strong>${pnCuando(ms)}</strong>.`:'.');
+function pnCrece(A,mezcla,n,T,malo){
+  // mezcla {g,p,m} en $; valor tras n meses. «malo»: el ganado pierde 25 % y no rinde ese año.
+  const gv=malo?mezcla.g*(1-PN_PERDIDA_GANADO):mezcla.g*Math.pow(1+T.gan,n);
+  return gv+mezcla.p*Math.pow(1+T.pfA/1200,n)+mezcla.m*Math.pow(1+T.metaA/1200,n);
+}
+function renderPanelDecision(){
+  const ev=pnEventos(), chips=document.getElementById('pn-d-chips');
+  const manual=parseFloat((document.getElementById('pn-d-monto')||{}).value)||0;
+  if(!_pnEvento||(_pnEvento!=='manual'&&!ev.find(e=>e.id===_pnEvento)))_pnEvento=ev.length?ev[0].id:'manual';
+  if(chips)chips.innerHTML=ev.map(e=>`<button class="${_pnEvento===e.id?'act':''}" onclick="_pnEvento='${e.id}';renderPanelDecision()">${e.ico} ${esc(e.nom)}<br><span>${fm(e.monto)}${e.est?' (est.)':''} · ${pnMesLargo(e.k)}</span></button>`).join('')+
+    `<button class="${_pnEvento==='manual'?'act':''}" onclick="_pnEvento='manual';renderPanelDecision()">✍️ Otro monto<br><span>${manual>0?fm(manual):'un cobro, un bono…'}</span></button>`;
+  const man=document.getElementById('pn-d-manual');if(man)man.style.display=_pnEvento==='manual'?'grid':'none';
+  const sel=_pnEvento==='manual'?{nom:'Este dinero',monto:manual,k:parseInt((document.getElementById('pn-d-cuando')||{}).value)||0}:ev.find(e=>e.id===_pnEvento);
+  const cu=document.getElementById('pn-d-cuando');
+  if(cu&&!cu.options.length)cu.innerHTML=Array.from({length:13},(_,k)=>`<option value="${k}">${k===0?'Este mes':pnMesLargo(k)}</option>`).join('');
+  const nota=document.getElementById('pn-n-dec');
+  if(!sel||!(sel.monto>0)){if(nota)nota.innerHTML='Escribe un monto para comparar.';if(_pnCharts['pn-c-dec']){_pnCharts['pn-c-dec'].destroy();delete _pnCharts['pn-c-dec'];}return;}
+  const A=sel.monto, k0=sel.k, T=pnTasas(), Rc=pnRecomendar(A,k0), H=24;
+  const opciones=[
+    {lbl:'🐄 Todo a ganado',col:PN_COL.gan,mez:{g:A,p:0,m:0}},
+    {lbl:'🏦 Todo a plazo fijo',col:PN_COL.pf,mez:{g:0,p:A,m:0}},
+    {lbl:'⭐ Recomendado',col:PN_COL.sim,mez:{g:Rc.g,p:Rc.p,m:Rc.e},w:3},
+  ];
+  const labels=Array.from({length:H+1},(_,n)=>pnMesLbl(k0+n));
+  const ds=opciones.map(o=>({label:o.lbl,data:labels.map((_,n)=>pnCrece(A,o.mez,n,T)-A),borderColor:o.col,borderWidth:o.w||2,pointRadius:0,pointHoverRadius:4,fill:false,tension:.2}));
+  ds.push({label:'🐄 Ganado en un mal año (−25 %)',data:labels.map((_,n)=>n===12?pnCrece(A,{g:A,p:0,m:0},n,T,true)-A:null),borderColor:PN_COL.malo,backgroundColor:PN_COL.malo,showLine:false,pointRadius:6,pointHoverRadius:8,pointStyle:'triangle',rotation:180,fill:false});
+  if(typeof Chart!=='undefined')pnChart('pn-c-dec',{type:'line',data:{labels,datasets:ds},options:pnOpts()});
+  const g12=o=>pnCrece(A,o.mez,12,T)-A, g24=o=>pnCrece(A,o.mez,24,T)-A;
+  const malo12=pnCrece(A,{g:A,p:0,m:0},12,T,true)-A;
+  const partes=[];
+  if(Rc.e>0.5)partes.push(`<strong>${fm(Rc.e)}</strong> a tu fondo de emergencia (meta: ${PN_MESES_EMERG} meses de gasto típico = ${fm(Rc.objEmerg)}; hoy tienes ${fm(Rc.C.emerg)})`);
+  if(Rc.g>0.5)partes.push(`<strong>${fm(Rc.g)}</strong> a ganado`);
+  if(Rc.p>0.5)partes.push(`<strong>${fm(Rc.p)}</strong> a plazo fijo`);
+  if(nota)nota.innerHTML=`<div class="pn-reco">🤖 <strong>Mi recomendación</strong> para ${esc(sel.nom)} (${fm(A)}, ${pnMesLargo(k0)}): ${partes.join(', ')}. `+
+    `Así tu ganado queda en ${Rc.pctGanDesp.toFixed(0)} % del portafolio (perfil ${Rc.perfil.nom}).`+
+    (Rc.faltaE>0?` Primero va el colchón: sin él, una emergencia te obliga a sacar plata del ganado en mal momento.`:'')+`</div>`+
+    `<table class="pn-tab"><tr><th></th><th>Gana en 1 año</th><th>En 2 años</th><th>Riesgo</th></tr>`+
+    opciones.map(o=>`<tr><td><span class="pn-dot" style="background:${o.col}"></span>${o.lbl}</td><td>+${fm(g12(o))}</td><td>+${fm(g24(o))}</td><td>${o.mez.g>=A*0.99?'Alto':o.mez.g>0?'Medio':'Bajo'}</td></tr>`).join('')+
+    `</table><div style="font-size:10px;color:var(--tx3);margin-top:4px;">Si el ganado tiene un mal año (pierde 25 %), «todo a ganado» termina en ${pnFs(malo12)}. El plazo fijo no cambia.`+
+    (T.ganN<3?` Ojo: la tasa del ganado sale de ${T.ganN} lote${T.ganN===1?'':'s'} vendido${T.ganN===1?'':'s'}; con más ventas será más confiable.`:'')+`</div>`;
 }
 
+// ── 4. Portafolio: rendimiento contra riesgo, en la misma gráfica ──
+function renderPanelPortafolio(){
+  const C=pnCartera(), T=pnTasas(), tot=C.tot;
+  if(!(tot>0))return;
+  const actual={id:'act',nom:'📍 Hoy',g:C.gan/tot,p:C.pf/tot,m:C.metas/tot,nota:'tu reparto actual'};
+  const perfiles=[actual,...PN_PERFILES];
+  const normal=x=>tot*(x.g*T.ganA+x.p*T.pfA/100+x.m*T.metaA/100);
+  const malo=x=>tot*(-x.g*PN_PERDIDA_GANADO+x.p*T.pfA/100+x.m*T.metaA/100);
+  if(typeof Chart!=='undefined')pnChart('pn-c-port',{type:'bar',data:{labels:perfiles.map(x=>x.nom),datasets:[
+    {label:'Año normal',data:perfiles.map(normal),backgroundColor:PN_COL.sim,borderRadius:4,borderSkipped:false},
+    {label:'Mal año del ganado (−25 %)',data:perfiles.map(malo),backgroundColor:PN_COL.malo,borderRadius:4,borderSkipped:false},
+  ]},options:pnOpts({interaction:{mode:'index',intersect:false},scales:{x:Object.assign({},pnOpts().scales.x,{ticks:{color:PN_COL.tick,font:{size:9},maxRotation:0,autoSkip:false}}),y:pnOpts().scales.y}})});
+  const Rc=pnRecomendar(0,0), reco=Rc.perfil;
+  const n=document.getElementById('pn-n-port');
+  if(n)n.innerHTML=`<table class="pn-tab"><tr><th></th><th>🐄</th><th>🏦</th><th>🎯</th><th>Año normal</th><th>Mal año</th></tr>`+
+    perfiles.map(x=>`<tr${x.id===reco.id?' class="pn-sel"':''}><td>${x.nom}</td><td>${(x.g*100).toFixed(0)}%</td><td>${(x.p*100).toFixed(0)}%</td><td>${(x.m*100).toFixed(0)}%</td><td>${pnFs(normal(x))}</td><td>${pnFs(malo(x))}</td></tr>`).join('')+`</table>`+
+    `<div class="pn-reco">🤖 Para tu meta de la finca (unos ${Math.max(1,Math.round((pnLlegaMeta(pnProyectar(600))||0)/12))} años) te recomiendo el perfil <strong>${reco.nom}</strong>: ${reco.nota}. `+
+    (Rc.faltaE>0?`Mientras tu fondo de emergencia no llegue a ${fm(Rc.objEmerg)} (hoy ${fm(Rc.C.emerg)}), mantente en Conservador. `:'')+
+    `Hoy tienes ${(actual.g*100).toFixed(0)} % en ganado; no muevas lo que está invertido: ajusta el reparto con el dinero que se libera (ver arriba).</div>`;
+}
 function renderPie(ev,imp,deu,aho,pev,pimp,pdeu,paho){
   if(typeof Chart==='undefined'){
     const _cw=document.getElementById('pieChart');

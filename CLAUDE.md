@@ -208,20 +208,36 @@ hoja, con su revisión). Lo que difiere entre ambas son cambios aún no subidos.
 
 Gráficas vivas para el celular, sin cifras propias: todo sale de las funciones del
 Dashboard (`efectivoHoy`, `cashRealFinMes`, `calcProyeccion`, `ahorrosEsperadosMes`,
-`calcMetaConRetiros`). Funciones `pn*` y `renderPanel*`.
+`calcMetaConRetiros`, `saldoFinalMeta`, `retornoPF`). Funciones `pn*` y `renderPanel*`.
 
-- **Cash del mes día a día**: real hasta hoy (cierra exacto en `efectivoHoy`),
-  proyección a fin de mes (cierra exacto en `cashRealFinMes`, TC al último día) y al
-  mes siguiente con el neto promedio de los 3 últimos meses cerrados.
-- **Pasivo contra gasto**: rendimiento mensual del capital por fuente frente al gasto
-  de consumo (promedio de 3 meses cerrados: `ev+imp+deu` + TC; el ahorro no es gasto).
-- **Simulador**: monto, destino y mes; compara pasivo y patrimonio con y sin la decisión.
+- **Indicadores**: efectivo hoy, egresos del mes (los mismos del Dashboard, con su
+  proyectado), ingreso pasivo por día y gastos fijos con su cobertura.
+- **Cash del mes día a día**: cada movimiento sube o baja la línea, rotulado (+/−) y
+  con su detalle al tocar el punto. Cierra exacto en `efectivoHoy`; la parte punteada
+  es el egreso proyectado que ya calcula la app (`calcProyeccion`) y la TC el último
+  día, y cierra exacto en `cashRealFinMes`. **No se usan promedios para el día a día**
+  (decisión del usuario, 21-nov-2026).
+- **Pasivo contra gastos**: rendimiento del capital por fuente frente a dos líneas:
+  gastos fijos (regla de «fijo» de la proyección, sin ahorro) y gasto total típico
+  (efectivo + TC, sin ahorro). **Mediana de los últimos 3 meses cerrados, por
+  categoría para los fijos**: un gasto que dejó de repetirse (el carro ya pagado) no
+  cuenta. El promedio simple daba >$2.000 por un pago único y el usuario lo rechazó.
+- **¿Qué hago con el dinero que se libera?**: metas, PF y lotes que vencen en 12
+  meses (o un monto manual). Compara todo a ganado, todo a PF y la recomendación, más
+  el mal año del ganado (−25 %, la misma escala de la tabla de riesgo de Inversiones).
+  Recomendación: primero el fondo de emergencia (3 meses de gasto típico; cuenta las
+  metas con «emergencia» en el nombre), luego ganado hasta el tope del perfil, el
+  resto a PF.
+- **Portafolio**: reparto actual contra Conservador 20/50/30 (el de Inversiones),
+  Balanceado 40/40/20 y Crecimiento 60/25/15: ganancia en año normal y en mal año.
+  Se recomienda Conservador mientras falte fondo de emergencia; luego Balanceado.
 - Supuestos de `pnProyectar`: ganado al rendimiento real de los lotes vendidos (tu
   parte, vía `retornoGanado`), PF y metas a su `tasaA`, todo reinvertido; las metas se
-  renuevan con su aporte actual al terminar el plazo; un PF nuevo del simulador usa
-  la mejor tasa de PF registrada. Meta de la finca: `PN_META_FINCA`.
+  renuevan con su aporte actual. Meta de la finca: `PN_META_FINCA`.
 - Paleta de series validada para el fondo oscuro: ganado `#c97d26`, PF `#1fa196`,
-  metas `#8a6be6`.
+  metas `#8a6be6`; recomendado `#f2c94c`, mal año `#e07a6a`.
+- Para capturar pantallas en pruebas: hacerlo por tarjeta con la gráfica a la vista;
+  en una captura de página completa las gráficas fuera de pantalla salen a medio animar.
 
 ---
 

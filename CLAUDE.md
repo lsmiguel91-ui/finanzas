@@ -3,7 +3,7 @@
 App de control de ingresos, egresos e inversiones. Un solo archivo HTML
 sincronizado con Google Sheets vía Apps Script, publicado como PWA.
 
-Última publicación: **App actualizada 21-nov-2026** (interno v47)
+Última publicación: **App actualizada 28-nov-2026** (interno v48)
 
 > **El repositorio es público.** Aquí no van cifras, ids de archivos ni datos del
 > usuario: todo eso está en el archivo privado de Google Drive `finanzas_privado_AAAA-MM-DD.md`
@@ -184,6 +184,7 @@ al importar el PDF. Ampliarlo cuando aparezcan comercios nuevos en "Otros".
 | Marcas «sin factura» de v39 perdidas (todo contaba como facturado) con la bandera `_migFacturaV39` puesta | Una escritura con datos anteriores a v39 (pestaña vieja abierta o sync de Ganadería sin bloqueo) pisó la hoja; al leer, `Object.assign` conservó la bandera **local** y la migración no volvió a correr | v40: `load()` suelta las claves `_*` que la hoja no trae; `migrarFacturaV40()` repara; `db._appVer` + recarga si la hoja la escribió una versión más nueva; lectura al volver a la app |
 | Señal de venta del lote decía «No aceptes menos de» el precio normal del mercado, por debajo de lo pagado; y «VENDE» a un lote recién comprado | La señal viene de Ganadería y solo mira el mercado, no el costo del lote | v44: una tarjeta por lote; piso = mayor entre mercado y `senal.precioEquilibrio` (más `precioObjetivo` y `capitalRecuperado`), que debe enviar Ganadería; si el lote no llegó a su fecha de venta dice «En engorde» |
 | El Panel no reflejaba la TC recién importada | Solo se repintaba al cambiar de pestaña o con `repintarTodo`; `sincronizar()` y otros caminos refrescaban solo el Dashboard. Y la gráfica de cash mostraba la TC solo como un salto al final del mes | v47: `pnRefrescar()` (agrupado, solo si el Panel está a la vista) desde `save()`, `refreshDash()` y `confirmarTC()`; línea «💳 Descontando la tarjeta» con cada consumo del estado en su día real, que cierra en `cashRealFinMes` |
+| Gastos de lote de la Bitácora («gll_…») contados como consumo («Ganado») en vez de reinversión | Ganadería los manda con `categoria:'Reinversión'` y `flujoInv:true`, pero `syncEgresosGanaderia` del Apps Script (hasta v5) fijaba `'Ganado'` y descartaba `flujoInv` | v48: `migrarGllReinversionV48()` repara los existentes (solo categoría y `flujoInv`); `esFlujoInv` y `es_flujo_inv` del reporte reconocen el prefijo `gll_` aunque un script viejo los reescriba; Apps Script v6 respeta `categoria`/`flujoInv` del egreso (cambio en Drive, lo pega el usuario). Verificado: cash de may–nov idéntico; solo pasan de Imprevistos a flujo de inversiones |
 
 ### Sincronización desde v42 (auditoría del 15-nov-2026, hallazgos F1–F9)
 

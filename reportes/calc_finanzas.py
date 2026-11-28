@@ -31,7 +31,9 @@ META_FINCA = 100000.0
 
 
 def es_flujo_inv(m):
-    return bool(m.get('flujoInv') or m.get('categoria') == 'Reinversión')
+    # Gastos de lote de la Bitácora («gll_…»): reinversión, igual que en la app (v48).
+    return bool(m.get('flujoInv') or m.get('categoria') == 'Reinversión'
+                or str(m.get('id') or '').startswith('gll_'))
 
 
 def mes_ant(yr, mi):

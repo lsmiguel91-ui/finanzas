@@ -856,8 +856,8 @@ function renderConexionEstado(){
   }
 }
 const SK='finanzas_drive_v1';
-const APP_VERSION='v47'; // interno: caché y control de versión entre equipos; no se muestra
-const APP_FECHA='2026-11-21'; // fecha de publicación: es lo que ve el usuario («App actualizada …»)
+const APP_VERSION='v48'; // interno: caché y control de versión entre equipos; no se muestra
+const APP_FECHA='2026-11-28'; // fecha de publicación: es lo que ve el usuario («App actualizada …»)
 // El ahorro mensual esperado ya NO es una constante: se deriva del tramo vigente de
 // cada meta (ver ahorrosEsperadosMes). Si cambia un tramo, el esperado se actualiza solo.
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1011,6 +1011,18 @@ function migrarRetornosFlujoV43(){
   db._migRetornosFlujoV43=true;
   save();
 }
+// Gastos de lote de la Bitácora («gll_…»): Ganadería los manda como «Reinversión» con
+// flujoInv, pero el Apps Script hasta v5 los guardaba como «Ganado». Solo cambia la
+// clasificación: montos y fechas quedan igual y el cash no cambia (antes restaban como
+// egreso del mes, ahora como salida de flujo de inversiones).
+function migrarGllReinversionV48(){
+  if(db._migGllV48)return;
+  (db.movimientos||[]).forEach(m=>{
+    if(m.tipo==='egreso'&&String(m.id||'').startsWith('gll_')){m.categoria='Reinversión';m.flujoInv=true;}
+  });
+  db._migGllV48=true;
+  save();
+}
 // Lista única de migraciones (cada una con su bandera: solo actúa si falta).
 function correrMigraciones(){
   limpiarMayo();
@@ -1026,6 +1038,7 @@ function correrMigraciones(){
   migrarFacturaV40();
   migrarSalidaAgo26();
   migrarRetornosFlujoV43();
+  migrarGllReinversionV48();
 }
 // Tras combinar dentro de un guardado. Con tope: si un equipo con código viejo pisara
 // la hoja una y otra vez, migrar y volver a guardar sin fin martillaría el script.
@@ -1631,7 +1644,9 @@ const diffD=(a,b)=>Math.ceil((new Date(b)-new Date(a))/(864e5));
 // ── Flujo de inversiones ──
 // Retornos de inversiones cerradas (ingreso con flujoInv) y Reinversiones (egreso 'Reinversión')
 // NO entran en Ingresos (A) ni Egresos (B) ni en el 40-30-30; sí afectan el cash real.
-const esFlujoInv=m=>!!(m&&(m.flujoInv||m.categoria==='Reinversión'));
+// Los gastos de LOTE de la Bitácora Ganadera (id «gll_…») son reinversión aunque un Apps
+// Script anterior a v6 los reescriba como «Ganado»: así nunca vuelven a contarse como consumo.
+const esFlujoInv=m=>!!(m&&(m.flujoInv||m.categoria==='Reinversión'||String(m.id||'').startsWith('gll_')));
 function flujoInvMes(yr,mi){
   let ent=0,sal=0;
   (db.movimientos||[]).forEach(m=>{
